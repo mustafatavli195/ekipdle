@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/app/lib/supabaseClient';
 import { useParams } from 'next/navigation';
 
@@ -21,29 +21,30 @@ export default function ManageGame() {
   const [height, setHeight] = useState('');
   const [weight, setWeight] = useState('');
 
-  useEffect(() => {
-    fetchFriends();
-  }, []);
-
-  const fetchFriends = async () => {
+  // fetchFriends fonksiyonunu useCallback ile sarmaladık
+  const fetchFriends = useCallback(async () => {
     const { data, error } = await supabase
       .from('friends')
       .select('*')
-      .eq('game_id', String(gameId)); // 👈 garanti string
+      .eq('game_id', String(gameId));
 
     console.log("Game ID:", gameId);
     console.log("Friends data:", data);
     console.log("Supabase error:", error);
 
     setFriends(data || []);
-  };
+  }, [gameId]);
+
+  useEffect(() => {
+    fetchFriends();
+  }, [fetchFriends]); // artık exhaustive-deps hatası yok
 
   const addFriend = async () => {
     if (!name || !hint) return;
     const { data, error } = await supabase
       .from('friends')
       .insert([{
-        game_id: String(gameId), // 👈 garanti string
+        game_id: String(gameId),
         name,
         hint,
         height,

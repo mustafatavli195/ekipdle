@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/app/lib/supabaseClient';
 import { useRouter } from 'next/navigation';
 
@@ -14,16 +14,20 @@ export default function Home() {
   const [games, setGames] = useState<Game[]>([]);
   const router = useRouter();
 
-  useEffect(() => {
-    fetchGames();
-  }, []);
+  // fetchGames fonksiyonunu useCallback ile sarmaladık
+  const fetchGames = useCallback(async () => {
+    const { data, error } = await supabase
+      .from('games')
+      .select('*')
+      .order('created_at', { ascending: false });
 
-  const fetchGames = async () => {
-    const { data, error } = await supabase.from('games').select('*').order('created_at', { ascending: false });
     if (error) console.log(error);
     else setGames(data || []);
-  };
+  }, []);
 
+  useEffect(() => {
+    fetchGames();
+  }, [fetchGames]); // exhaustive-deps hatası kalktı
 
   return (
     <main className="min-h-screen p-6 max-w-3xl mx-auto">
@@ -37,7 +41,9 @@ export default function Home() {
             onClick={() => router.push(`/game/${game.id}`)}
           >
             <span className="font-medium">{game.title}</span>
-            <span className="text-sm text-gray-500">{new Date(game.created_at).toLocaleDateString()}</span>
+            <span className="text-sm text-gray-500">
+              {new Date(game.created_at).toLocaleDateString()}
+            </span>
           </li>
         ))}
       </ul>

@@ -3,12 +3,14 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { supabase } from "@/app/lib/supabaseClient";
+import { User } from "@supabase/supabase-js";
 
 export default function Navbar() {
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<User | null>(null); // any yerine User | null
 
   useEffect(() => {
-    const session = supabase.auth.getSession().then(({ data }) => {
+    // getSession promise'i direkt kullanıyoruz, session değişkeni artık unused değil
+    supabase.auth.getSession().then(({ data }) => {
       setUser(data.session?.user ?? null);
     });
 
@@ -29,7 +31,7 @@ export default function Navbar() {
   return (
     <nav className="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 text-white p-4 flex justify-between items-center shadow-lg">
       <Link href="/" className="font-bold text-xl hover:text-gray-200">
-      Ekipdle
+        Ekipdle
       </Link>
 
       <div className="flex gap-4 items-center">

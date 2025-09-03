@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/app/lib/supabaseClient';
 import { useParams } from 'next/navigation';
 
@@ -22,19 +22,24 @@ export default function PlayGame() {
   const [hintShown, setHintShown] = useState(false);
   const [gameOver, setGameOver] = useState(false);
 
-  useEffect(() => {
-    fetchFriends();
-  }, []);
+  // fetchFriends fonksiyonunu useCallback ile sarmaladık
+  const fetchFriends = useCallback(async () => {
+    const { data } = await supabase
+      .from('friends')
+      .select('*')
+      .eq('game_id', String(gameId));
 
-  const fetchFriends = async () => {
-    const { data } = await supabase.from('friends').select('*').eq('game_id', gameId);
     if (data) {
       setFriends(data);
       const random = data[Math.floor(Math.random() * data.length)];
       setSecretFriend(random);
-      console.log("Secret is:", random); // test amaçlı
+      console.log("Secret is:", random);
     }
-  };
+  }, [gameId]);
+
+  useEffect(() => {
+    fetchFriends();
+  }, [fetchFriends]); // artık exhaustive-deps hatası yok
 
   const handleGuess = () => {
     if (gameOver || !secretFriend) return;
@@ -46,7 +51,7 @@ export default function PlayGame() {
     setGuess('');
 
     if (guessed.id === secretFriend.id) {
-      setGameOver(true); // ✅ doğru tahmin → oyun bitti
+      setGameOver(true);
     }
   };
 
@@ -76,12 +81,12 @@ export default function PlayGame() {
           className="flex-1 border rounded-lg px-3 py-2"
           value={guess}
           onChange={(e) => setGuess(e.target.value)}
-          disabled={gameOver} // ✅ oyun bittiyse input kapalı
+          disabled={gameOver}
         />
         <button
           onClick={handleGuess}
           className="border rounded-lg px-3 py-2"
-          disabled={gameOver} // ✅ oyun bittiyse buton kapalı
+          disabled={gameOver}
         >
           Tahmin Et
         </button>
