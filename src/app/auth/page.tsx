@@ -47,7 +47,7 @@ export default function AuthPage() {
       provider: "google",
       options: { redirectTo: window.location.origin + "/dashboard" },
     });
-    if (error) setError(error.message);
+    if (error) setError(error.message); 
   };
 
   return (

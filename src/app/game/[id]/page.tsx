@@ -5,6 +5,7 @@ import { supabase } from "@/app/lib/supabaseClient";
 import { useParams } from "next/navigation";
 import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
+import Confetti from "react-confetti";
 
 interface Friend {
   id: string;
@@ -88,12 +89,14 @@ export default function PlayGame() {
   const filteredFriends =
     guess.trim() === ""
       ? []
-      : friends.filter((f) =>
-          normalizeString(f.name).includes(normalizeString(guess))
-        );
+      : friends
+          .filter((f) =>
+            normalizeString(f.name).includes(normalizeString(guess))
+          )
+          .filter((f) => !guesses.find((g) => g.id === f.id));
 
   return (
-    <main className="min-h-screen p-6 max-w-5xl mx-auto font-comic text-gray-900">
+    <main className="min-h-screen p-6 max-w-5xl mx-auto font-comic text-gray-900 relative">
       <h1 className="text-4xl font-bold mb-6 text-center text-purple-700">
         Tahmin Et!
       </h1>
@@ -231,14 +234,48 @@ export default function PlayGame() {
         </AnimatePresence>
       </div>
 
+      {/* ✅ Oyun kazanılınca coşkulu kutlama */}
       {gameOver && secretFriend && (
         <motion.div
-          initial={{ opacity: 0, scale: 0.8 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.4 }}
-          className="mt-6 p-6 bg-green-200 border-2 border-green-300 rounded-2xl text-center font-bold text-gray-800 shadow-md text-2xl"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="fixed inset-0 flex items-center justify-center bg-black/60 z-50"
         >
-          🎉 Doğru bildin! Cevap: {secretFriend.name}
+          <Confetti
+            width={window.innerWidth}
+            height={window.innerHeight}
+            recycle={false}
+            numberOfPieces={800}
+          />
+
+          <motion.div
+            initial={{ scale: 0.8, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ duration: 0.5 }}
+            className="bg-white rounded-3xl shadow-2xl p-10 text-center max-w-lg w-full"
+          >
+            <h2 className="text-4xl font-extrabold text-purple-700 mb-4">
+              🎉 Kazandın! Tebrikler 🎉
+            </h2>
+            <p className="text-xl font-bold text-gray-700 mb-6">
+              Doğru cevap: {secretFriend.name}
+            </p>
+            <button
+              onClick={() => {
+                setGuesses([]);
+                setGuess("");
+                setGameOver(false);
+                if (friends.length > 0) {
+                  setSecretFriend(
+                    friends[Math.floor(Math.random() * friends.length)]
+                  );
+                }
+              }}
+              className="px-6 py-3 bg-purple-500 hover:bg-purple-400 text-white font-bold rounded-2xl shadow-md transition-transform transform hover:-translate-y-1"
+            >
+              Tekrar Oyna
+            </button>
+          </motion.div>
         </motion.div>
       )}
     </main>
