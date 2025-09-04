@@ -6,10 +6,9 @@ import { supabase } from "@/app/lib/supabaseClient";
 import { User } from "@supabase/supabase-js";
 
 export default function Navbar() {
-  const [user, setUser] = useState<User | null>(null); // any yerine User | null
+  const [user, setUser] = useState<User | null>(null);
 
   useEffect(() => {
-    // getSession promise'i direkt kullanıyoruz, session değişkeni artık unused değil
     supabase.auth.getSession().then(({ data }) => {
       setUser(data.session?.user ?? null);
     });
@@ -29,27 +28,36 @@ export default function Navbar() {
   };
 
   return (
-    <nav className="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 text-white p-4 flex justify-between items-center shadow-lg">
-      <Link href="/" className="font-bold text-xl hover:text-gray-200">
+    <nav className="bg-gray-900 bg-purple-200/30 backdrop-blur-lg p-4 flex justify-between items-center shadow-md border-b border-purple-300 rounded-b-xl">
+      <Link
+        href="/"
+        className="font-bold text-2xl text-purple-700 hover:text-purple-500 transition-all duration-300"
+      >
         Ekipdle
       </Link>
 
       <div className="flex gap-4 items-center">
-        <Link href="/" className="hover:text-gray-200">
+        <Link
+          href="/"
+          className="text-purple-700 hover:text-purple-500 transition-all duration-300"
+        >
           Ana Sayfa
         </Link>
-        <Link href="/dashboard" className="hover:text-gray-200">
+        <Link
+          href="/dashboard"
+          className="text-purple-700 hover:text-purple-500 transition-all duration-300"
+        >
           Oyun Kur
         </Link>
 
         {user ? (
           <>
-            <span className="px-2 py-1 bg-white text-indigo-600 rounded-full text-sm font-medium">
+            <span className="px-3 py-1 bg-purple-100 text-purple-700 rounded-full text-sm font-bold shadow-sm">
               {user.email || "Kullanıcı"}
             </span>
             <button
               onClick={handleSignOut}
-              className="px-3 py-1 bg-red-500 hover:bg-red-600 rounded-lg text-sm"
+              className="px-3 py-1 bg-red-200 hover:bg-red-100 rounded-xl text-sm font-bold transition-all duration-300 shadow-sm transform hover:-translate-y-1"
             >
               Çıkış Yap
             </button>
@@ -57,7 +65,7 @@ export default function Navbar() {
         ) : (
           <Link
             href="/auth"
-            className="px-3 py-1 bg-green-500 hover:bg-green-600 rounded-lg text-sm"
+            className="px-3 py-1 bg-green-200 hover:bg-green-100 rounded-xl text-sm font-bold transition-all duration-300 shadow-sm transform hover:-translate-y-1"
           >
             Giriş Yap
           </Link>
