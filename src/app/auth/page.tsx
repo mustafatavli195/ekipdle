@@ -14,7 +14,7 @@ export default function AuthPage() {
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
-      if (data.session) router.replace("/dashboard");
+      if (data.session) router.replace("");
     });
   }, [router]);
 
@@ -33,7 +33,7 @@ export default function AuthPage() {
         });
         if (error) throw error;
       }
-      router.replace("/dashboard");
+      router.replace("");
     } catch (err: unknown) {
       if (err instanceof Error) setError(err.message);
       else setError("Bir hata oluştu");
@@ -47,7 +47,7 @@ export default function AuthPage() {
       provider: "google",
       options: { redirectTo: window.location.origin + "/dashboard" },
     });
-    if (error) setError(error.message);
+    if (error) setError(error.message); 
   };
 
   return (
