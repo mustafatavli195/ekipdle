@@ -5,27 +5,22 @@ import { useRouter, useParams } from "next/navigation";
 import { supabase } from "@/app/lib/supabaseClient";
 import Image from "next/image";
 
+interface Interest {
+  id: string;
+  name: string;
+}
+
 interface Friend {
   id?: string;
   name: string;
   height: string;
   weight: string;
   gender?: "Erkek" | "Kadın" | "Bilinmiyor";
-  zodiac?:
-    | "Koç"
-    | "Boğa"
-    | "İkizler"
-    | "Yengeç"
-    | "Aslan"
-    | "Başak"
-    | "Terazi"
-    | "Akrep"
-    | "Yay"
-    | "Oğlak"
-    | "Kova"
-    | "Balık";
   iq?: number;
+  charm?: number;
+  race?: "Kürt" | "Türk" | "Karadeniz" | "Amerika" | "Zenci" | "Danimarka";
   photo_url?: string;
+  interests?: Interest[];
 }
 
 export default function ManageGamePage() {
@@ -34,19 +29,23 @@ export default function ManageGamePage() {
   const [loading, setLoading] = useState(true);
   const [authorized, setAuthorized] = useState(false);
   const [friends, setFriends] = useState<Friend[]>([]);
+  const [allInterests, setAllInterests] = useState<Interest[]>([]);
 
   const [newFriend, setNewFriend] = useState<Friend>({
     name: "",
     height: "",
     weight: "",
     gender: "Bilinmiyor",
-    zodiac: undefined,
     iq: undefined,
+    charm: undefined,
+    race: undefined,
+    interests: [],
   });
   const [newPhoto, setNewPhoto] = useState<File | null>(null);
 
   const [editingFriend, setEditingFriend] = useState<Friend | null>(null);
   const [editPhoto, setEditPhoto] = useState<File | null>(null);
+  const [editInterests, setEditInterests] = useState<Interest[]>([]);
 
   useEffect(() => {
     const checkOwnership = async () => {
@@ -72,6 +71,7 @@ export default function ManageGamePage() {
       setAuthorized(true);
       setLoading(false);
       fetchFriends();
+      fetchInterests();
     };
 
     checkOwnership();
@@ -80,12 +80,33 @@ export default function ManageGamePage() {
   const fetchFriends = async () => {
     const { data, error } = await supabase
       .from("friends")
-      .select("*")
+      .select(
+        `
+      *,
+      friend_interests (
+        interests (id, name)
+      )
+    `
+      )
       .eq("game_id", String(gameId));
 
-    if (error) console.error("Fetch friends error:", error);
+    if (error) {
+      console.error("Fetch friends error:", error);
+      return;
+    }
 
-    setFriends(data || []);
+    const normalized = (data || []).map((f: any) => ({
+      ...f,
+      interests: f.friend_interests?.map((fi: any) => fi.interests) || [],
+    }));
+
+    setFriends(normalized);
+  };
+
+  const fetchInterests = async () => {
+    const { data, error } = await supabase.from("interests").select("*");
+    if (error) console.error("Fetch interests error:", error);
+    setAllInterests(data || []);
   };
 
   const uploadPhoto = async (friendId: string, file: File) => {
@@ -129,7 +150,18 @@ export default function ManageGamePage() {
     try {
       const { data, error } = await supabase
         .from("friends")
-        .insert([{ game_id: gameId, ...newFriend }])
+        .insert([
+          {
+            game_id: gameId,
+            name: newFriend.name,
+            height: newFriend.height,
+            weight: newFriend.weight,
+            gender: newFriend.gender,
+            iq: newFriend.iq,
+            charm: newFriend.charm,
+            race: newFriend.race,
+          },
+        ])
         .select();
 
       if (error) {
@@ -138,19 +170,35 @@ export default function ManageGamePage() {
       }
 
       const newFriendData = data![0];
-      setFriends((prev) => [...prev, newFriendData]);
 
       if (newPhoto) {
         await uploadPhoto(newFriendData.id!, newPhoto);
       }
+
+      let interestsToSet: Interest[] = [];
+      if (newFriend.interests?.length) {
+        const insertInterests = newFriend.interests.map((i) => ({
+          friend_id: newFriendData.id,
+          interest_id: i.id,
+        }));
+        await supabase.from("friend_interests").insert(insertInterests);
+        interestsToSet = newFriend.interests;
+      }
+
+      setFriends((prev) => [
+        ...prev,
+        { ...newFriendData, interests: interestsToSet },
+      ]);
 
       setNewFriend({
         name: "",
         height: "",
         weight: "",
         gender: "Bilinmiyor",
-        zodiac: undefined,
         iq: undefined,
+        charm: undefined,
+        race: undefined,
+        interests: [],
       });
       setNewPhoto(null);
     } catch (err) {
@@ -167,6 +215,7 @@ export default function ManageGamePage() {
   const handleOpenEdit = (friend: Friend) => {
     setEditingFriend(friend);
     setEditPhoto(null);
+    setEditInterests(friend.interests || []);
   };
 
   const handleSaveEdit = async () => {
@@ -179,8 +228,9 @@ export default function ManageGamePage() {
         height: editingFriend.height,
         weight: editingFriend.weight,
         gender: editingFriend.gender,
-        zodiac: editingFriend.zodiac,
         iq: editingFriend.iq,
+        charm: editingFriend.charm,
+        race: editingFriend.race,
       })
       .eq("id", editingFriend.id);
 
@@ -193,8 +243,27 @@ export default function ManageGamePage() {
       await uploadPhoto(editingFriend.id!, editPhoto);
     }
 
+    if (editingFriend.id) {
+      await supabase
+        .from("friend_interests")
+        .delete()
+        .eq("friend_id", editingFriend.id);
+
+      if (editInterests.length) {
+        const insertInterests = editInterests.map((i) => ({
+          friend_id: editingFriend.id,
+          interest_id: i.id,
+        }));
+        await supabase.from("friend_interests").insert(insertInterests);
+      }
+    }
+
     setFriends((prev) =>
-      prev.map((f) => (f.id === editingFriend.id ? editingFriend : f))
+      prev.map((f) =>
+        f.id === editingFriend.id
+          ? { ...editingFriend, interests: editInterests }
+          : f
+      )
     );
     setEditingFriend(null);
   };
@@ -235,8 +304,6 @@ export default function ManageGamePage() {
             setNewFriend({ ...newFriend, weight: e.target.value })
           }
         />
-
-        {/* IQ alanı ipucu yerine */}
         <input
           type="number"
           placeholder="IQ"
@@ -246,6 +313,18 @@ export default function ManageGamePage() {
             setNewFriend({
               ...newFriend,
               iq: e.target.value ? parseInt(e.target.value) : undefined,
+            })
+          }
+        />
+        <input
+          type="number"
+          placeholder="Charm"
+          className="border rounded-lg px-3 py-2 bg-gray-800 w-full text-white"
+          value={newFriend.charm || ""}
+          onChange={(e) =>
+            setNewFriend({
+              ...newFriend,
+              charm: e.target.value ? parseInt(e.target.value) : undefined,
             })
           }
         />
@@ -267,27 +346,46 @@ export default function ManageGamePage() {
 
         <select
           className="border rounded-lg px-3 py-2 bg-gray-800 w-full text-white"
-          value={newFriend.zodiac || ""}
+          value={newFriend.race || ""}
           onChange={(e) =>
             setNewFriend({
               ...newFriend,
-              zodiac: e.target.value as Friend["zodiac"],
+              race: e.target.value as Friend["race"],
             })
           }
         >
           <option value="">Seçiniz</option>
-          <option value="Koç">Koç</option>
-          <option value="Boğa">Boğa</option>
-          <option value="İkizler">İkizler</option>
-          <option value="Yengeç">Yengeç</option>
-          <option value="Aslan">Aslan</option>
-          <option value="Başak">Başak</option>
-          <option value="Terazi">Terazi</option>
-          <option value="Akrep">Akrep</option>
-          <option value="Yay">Yay</option>
-          <option value="Oğlak">Oğlak</option>
-          <option value="Kova">Kova</option>
-          <option value="Balık">Balık</option>
+          <option value="Kürt">Kürt</option>
+          <option value="Türk">Türk</option>
+          <option value="Karadeniz">Karadeniz</option>
+          <option value="Amerika">Amerika</option>
+          <option value="Zenci">Zenci</option>
+          <option value="Danimarka">Danimarka</option>
+        </select>
+
+        <label className="text-sm text-gray-300 col-span-1 md:col-span-2">
+          Interests (Ctrl/Cmd ile çoklu seçim)
+        </label>
+        <select
+          multiple
+          className="border rounded-lg px-3 py-2 bg-gray-800 w-full text-white col-span-1 md:col-span-2"
+          value={newFriend.interests?.map((i) => i.id) || []}
+          onChange={(e) => {
+            const selected = Array.from(
+              e.target.selectedOptions,
+              (o) => o.value
+            );
+            setNewFriend({
+              ...newFriend,
+              interests: allInterests.filter((i) => selected.includes(i.id)),
+            });
+          }}
+        >
+          {allInterests.map((i) => (
+            <option key={i.id} value={i.id}>
+              {i.name}
+            </option>
+          ))}
         </select>
 
         <input
@@ -332,9 +430,14 @@ export default function ManageGamePage() {
 
       {/* Edit Modal */}
       {editingFriend && (
-        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50">
-          <div className="bg-gray-900 p-6 rounded-xl w-full max-w-sm flex flex-col gap-4 relative">
-            {/* Daha belirgin kapatma tuşu */}
+        <div
+          className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50"
+          onClick={() => setEditingFriend(null)}
+        >
+          <div
+            className="bg-gray-900 p-6 rounded-xl w-full max-w-sm flex flex-col gap-3 relative"
+            onClick={(e) => e.stopPropagation()}
+          >
             <button
               onClick={() => setEditingFriend(null)}
               className="absolute top-2 right-2 text-white hover:text-red-500 text-3xl font-bold"
@@ -363,6 +466,7 @@ export default function ManageGamePage() {
               className="text-sm text-gray-300 w-full"
             />
 
+            <label className="text-sm text-gray-300">İsim</label>
             <input
               type="text"
               className="border rounded-lg px-3 py-2 bg-gray-800 w-full text-white"
@@ -370,8 +474,9 @@ export default function ManageGamePage() {
               onChange={(e) =>
                 setEditingFriend({ ...editingFriend, name: e.target.value })
               }
-              placeholder="İsim"
             />
+
+            <label className="text-sm text-gray-300">Boy</label>
             <input
               type="text"
               className="border rounded-lg px-3 py-2 bg-gray-800 w-full text-white"
@@ -379,8 +484,9 @@ export default function ManageGamePage() {
               onChange={(e) =>
                 setEditingFriend({ ...editingFriend, height: e.target.value })
               }
-              placeholder="Boy"
             />
+
+            <label className="text-sm text-gray-300">Kilo</label>
             <input
               type="text"
               className="border rounded-lg px-3 py-2 bg-gray-800 w-full text-white"
@@ -388,10 +494,9 @@ export default function ManageGamePage() {
               onChange={(e) =>
                 setEditingFriend({ ...editingFriend, weight: e.target.value })
               }
-              placeholder="Kilo"
             />
 
-            {/* IQ alanı ipucu yerine */}
+            <label className="text-sm text-gray-300">IQ</label>
             <input
               type="number"
               className="border rounded-lg px-3 py-2 bg-gray-800 w-full text-white"
@@ -402,9 +507,22 @@ export default function ManageGamePage() {
                   iq: e.target.value ? parseInt(e.target.value) : undefined,
                 })
               }
-              placeholder="IQ"
             />
 
+            <label className="text-sm text-gray-300">Charm</label>
+            <input
+              type="number"
+              className="border rounded-lg px-3 py-2 bg-gray-800 w-full text-white"
+              value={editingFriend.charm || ""}
+              onChange={(e) =>
+                setEditingFriend({
+                  ...editingFriend,
+                  charm: e.target.value ? parseInt(e.target.value) : undefined,
+                })
+              }
+            />
+
+            <label className="text-sm text-gray-300">Cinsiyet</label>
             <select
               className="border rounded-lg px-3 py-2 bg-gray-800 w-full text-white"
               value={editingFriend.gender || "Bilinmiyor"}
@@ -420,29 +538,48 @@ export default function ManageGamePage() {
               <option value="Bilinmiyor">Bilinmiyor</option>
             </select>
 
+            <label className="text-sm text-gray-300">Race</label>
             <select
               className="border rounded-lg px-3 py-2 bg-gray-800 w-full text-white"
-              value={editingFriend.zodiac || ""}
+              value={editingFriend.race || ""}
               onChange={(e) =>
                 setEditingFriend({
                   ...editingFriend,
-                  zodiac: e.target.value as Friend["zodiac"],
+                  race: e.target.value as Friend["race"],
                 })
               }
             >
               <option value="">Seçiniz</option>
-              <option value="Koç">Koç</option>
-              <option value="Boğa">Boğa</option>
-              <option value="İkizler">İkizler</option>
-              <option value="Yengeç">Yengeç</option>
-              <option value="Aslan">Aslan</option>
-              <option value="Başak">Başak</option>
-              <option value="Terazi">Terazi</option>
-              <option value="Akrep">Akrep</option>
-              <option value="Yay">Yay</option>
-              <option value="Oğlak">Oğlak</option>
-              <option value="Kova">Kova</option>
-              <option value="Balık">Balık</option>
+              <option value="Kürt">Kürt</option>
+              <option value="Türk">Türk</option>
+              <option value="Karadeniz">Karadeniz</option>
+              <option value="Amerika">Amerika</option>
+              <option value="Zenci">Zenci</option>
+              <option value="Danimarka">Danimarka</option>
+            </select>
+
+            <label className="text-sm text-gray-300">
+              Interests (Ctrl/Cmd ile çoklu seçim)
+            </label>
+            <select
+              multiple
+              className="border rounded-lg px-3 py-2 bg-gray-800 w-full text-white"
+              value={editInterests.map((i) => i.id)}
+              onChange={(e) => {
+                const selected = Array.from(
+                  e.target.selectedOptions,
+                  (o) => o.value
+                );
+                setEditInterests(
+                  allInterests.filter((i) => selected.includes(i.id))
+                );
+              }}
+            >
+              {allInterests.map((i) => (
+                <option key={i.id} value={i.id}>
+                  {i.name}
+                </option>
+              ))}
             </select>
 
             <div className="flex gap-3 justify-center mt-2">

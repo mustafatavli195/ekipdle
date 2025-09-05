@@ -14,7 +14,9 @@ interface Friend {
   weight: number;
   iq?: number;
   gender?: "Erkek" | "Kadın" | "Bilinmiyor";
-  zodiac?: string;
+  charm?: number;
+  race?: string;
+  interests?: string[];
   photo_url?: string;
 }
 
@@ -29,12 +31,27 @@ export default function PlayGame() {
   const fetchFriends = useCallback(async () => {
     const { data } = await supabase
       .from("friends")
-      .select("*")
+      .select(
+        `
+        *,
+        friend_interests (
+          interests (name)
+        )
+      `
+      )
       .eq("game_id", String(gameId));
 
     if (data && data.length > 0) {
-      setFriends(data);
-      setSecretFriend(data[Math.floor(Math.random() * data.length)]);
+      const normalized = data.map((f: any) => ({
+        ...f,
+        interests:
+          f.friend_interests?.map((fi: any) => fi.interests.name) || [],
+      }));
+
+      setFriends(normalized);
+      setSecretFriend(
+        normalized[Math.floor(Math.random() * normalized.length)]
+      );
     } else {
       setFriends([]);
       setSecretFriend(null);
@@ -68,23 +85,52 @@ export default function PlayGame() {
     if (guessed.id === secretFriend.id) setGameOver(true);
   };
 
+  const getInterestsStatus = (
+    guessInterests: string[],
+    secretInterests: string[]
+  ) => {
+    if (!guessInterests.length || !secretInterests.length) return "wrong";
+    const common = guessInterests.filter((i) => secretInterests.includes(i));
+    if (common.length === 0) return "wrong";
+    if (
+      common.length === secretInterests.length &&
+      guessInterests.length === secretInterests.length
+    )
+      return "correct";
+    return "partial";
+  };
+
   const renderBox = (
     label: string,
     value: string | number | JSX.Element,
     correct: boolean,
-    arrow?: string
+    arrow?: JSX.Element,
+    customBg?: string
   ) => (
     <div className="flex flex-col items-center mx-1">
       <span className="text-xs text-purple-600 mb-1">{label}</span>
       <div
-        className={`w-20 h-20 flex items-center justify-center text-center rounded-2xl font-bold transition-all duration-300 overflow-hidden text-sm ${
-          correct ? "bg-green-200" : "bg-pink-200"
-        } shadow-md`}
+        className={`w-20 h-20 flex items-center justify-center text-center rounded-2xl font-bold transition-all duration-300 overflow-hidden text-sm shadow-md ${
+          customBg ? customBg : correct ? "bg-green-200" : "bg-pink-200"
+        }`}
       >
         {value} {arrow}
       </div>
     </div>
   );
+
+  const getArrow = (
+    guessValue?: number,
+    secretValue?: number
+  ): JSX.Element | undefined => {
+    if (guessValue === undefined || secretValue === undefined) return undefined;
+    if (guessValue === secretValue) return undefined;
+    return guessValue > secretValue ? (
+      <span className="text-red-600 font-bold text-lg">⬆️</span>
+    ) : (
+      <span className="text-blue-600 font-bold text-lg">⬇️</span>
+    );
+  };
 
   const filteredFriends =
     guess.trim() === ""
@@ -154,10 +200,15 @@ export default function PlayGame() {
               <div className="flex flex-col">
                 <span className="font-bold text-purple-700">{f.name}</span>
                 <span className="text-xs text-purple-500">
-                  Boy: {f.height} | Kilo: {f.weight} | IQ: {f.iq || "-"}
+                  Boy: {f.height} | Kilo: {f.weight} | IQ: {f.iq || "-"} |
+                  Charm: {f.charm ? `${f.charm}/10` : "-"}
                 </span>
                 <span className="text-xs text-purple-400">
-                  Cinsiyet: {f.gender || "-"} | Burç: {f.zodiac || "-"}
+                  Cinsiyet: {f.gender || "-"} | Irk: {f.race || "-"}
+                </span>
+                <span className="text-xs text-purple-600">
+                  İlgi Alanları:{" "}
+                  {f.interests?.length ? f.interests.join(", ") : "-"}
                 </span>
               </div>
             </motion.div>
@@ -179,24 +230,19 @@ export default function PlayGame() {
             const weightCorrect = g.weight === secretFriend.weight;
             const iqCorrect = g.iq === secretFriend.iq;
             const genderCorrect = g.gender === secretFriend.gender;
-            const zodiacCorrect = g.zodiac === secretFriend.zodiac;
+            const charmCorrect = g.charm === secretFriend.charm;
+            const raceCorrect = g.race === secretFriend.race;
 
-            const heightArrow = !heightCorrect
-              ? g.height > secretFriend.height
-                ? "⬇️"
-                : "⬆️"
-              : "";
-            const weightArrow = !weightCorrect
-              ? g.weight > secretFriend.weight
-                ? "⬇️"
-                : "⬆️"
-              : "";
-            const iqArrow =
-              !iqCorrect && g.iq !== undefined && secretFriend.iq !== undefined
-                ? g.iq! > secretFriend.iq!
-                  ? "⬇️"
-                  : "⬆️"
-                : "";
+            const interestsStatus = getInterestsStatus(
+              g.interests || [],
+              secretFriend.interests || []
+            );
+            const interestsBgColor =
+              interestsStatus === "correct"
+                ? "bg-green-200"
+                : interestsStatus === "partial"
+                ? "bg-yellow-200"
+                : "bg-pink-200";
 
             return (
               <motion.div
@@ -223,18 +269,45 @@ export default function PlayGame() {
                   g.id === secretFriend.id
                 )}
                 {renderBox("İsim", g.name, nameCorrect)}
-                {renderBox("Boy", g.height, heightCorrect, heightArrow)}
-                {renderBox("Kilo", g.weight, weightCorrect, weightArrow)}
-                {renderBox("IQ", g.iq ?? "-", iqCorrect, iqArrow)}
                 {renderBox("Cinsiyet", g.gender || "-", genderCorrect)}
-                {renderBox("Burç", g.zodiac || "-", zodiacCorrect)}
+                {renderBox(
+                  "Boy",
+                  g.height,
+                  heightCorrect,
+                  getArrow(g.height, secretFriend.height)
+                )}
+                {renderBox(
+                  "Kilo",
+                  g.weight,
+                  weightCorrect,
+                  getArrow(g.weight, secretFriend.weight)
+                )}
+                {renderBox(
+                  "İlgi Alanları",
+                  g.interests?.length ? g.interests.join(", ") : "-",
+                  interestsStatus === "correct",
+                  undefined,
+                  interestsBgColor
+                )}
+                {renderBox(
+                  "IQ",
+                  g.iq ?? "-",
+                  iqCorrect,
+                  getArrow(g.iq, secretFriend.iq)
+                )}
+                {renderBox("Irk", g.race || "-", raceCorrect)}
+                {renderBox(
+                  "Charm",
+                  g.charm ? `${g.charm}/10` : "-",
+                  charmCorrect,
+                  getArrow(g.charm, secretFriend.charm)
+                )}
               </motion.div>
             );
           })}
         </AnimatePresence>
       </div>
 
-      {/* ✅ Oyun kazanılınca coşkulu kutlama */}
       {gameOver && secretFriend && (
         <motion.div
           initial={{ opacity: 0 }}
