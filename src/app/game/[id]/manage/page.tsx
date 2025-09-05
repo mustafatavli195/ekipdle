@@ -23,6 +23,22 @@ interface Friend {
   interests?: Interest[];
 }
 
+// Supabase'ten gelen ham veri tipi
+interface RawFriend {
+  id: string;
+  name: string;
+  height: string;
+  weight: string;
+  gender?: "Erkek" | "Kadın" | "Bilinmiyor";
+  iq?: number;
+  charm?: number;
+  race?: "Kürt" | "Türk" | "Karadeniz" | "Amerika" | "Zenci" | "Danimarka";
+  photo_url?: string;
+  friend_interests?: {
+    interests: Interest;
+  }[];
+}
+
 export default function ManageGamePage() {
   const { id: gameId } = useParams();
   const router = useRouter();
@@ -80,14 +96,7 @@ export default function ManageGamePage() {
   const fetchFriends = async () => {
     const { data, error } = await supabase
       .from("friends")
-      .select(
-        `
-      *,
-      friend_interests (
-        interests (id, name)
-      )
-    `
-      )
+      .select(`*, friend_interests (interests (id, name))`)
       .eq("game_id", String(gameId));
 
     if (error) {
@@ -95,9 +104,17 @@ export default function ManageGamePage() {
       return;
     }
 
-    const normalized = (data || []).map((f: any) => ({
-      ...f,
-      interests: f.friend_interests?.map((fi: any) => fi.interests) || [],
+    const normalized: Friend[] = (data || []).map((f: RawFriend) => ({
+      id: f.id,
+      name: f.name,
+      height: f.height,
+      weight: f.weight,
+      gender: f.gender,
+      iq: f.iq,
+      charm: f.charm,
+      race: f.race,
+      photo_url: f.photo_url,
+      interests: f.friend_interests?.map((fi) => fi.interests) || [],
     }));
 
     setFriends(normalized);
@@ -270,7 +287,6 @@ export default function ManageGamePage() {
 
   if (loading) return <p>Yükleniyor...</p>;
   if (!authorized) return null;
-
   return (
     <main className="min-h-screen p-6 max-w-3xl mx-auto bg-gray-900 text-gray-100 relative">
       <h1 className="text-3xl font-semibold mb-6 text-center">

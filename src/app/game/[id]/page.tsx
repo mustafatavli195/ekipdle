@@ -20,6 +20,22 @@ interface Friend {
   photo_url?: string;
 }
 
+// Supabase'ten gelen ham veri tipi
+interface RawFriend {
+  id: string;
+  name: string;
+  height: number;
+  weight: number;
+  iq?: number;
+  gender?: "Erkek" | "Kadın" | "Bilinmiyor";
+  charm?: number;
+  race?: string;
+  photo_url?: string;
+  friend_interests?: {
+    interests: { name: string };
+  }[];
+}
+
 export default function PlayGame() {
   const { id: gameId } = useParams();
   const [friends, setFriends] = useState<Friend[]>([]);
@@ -31,21 +47,13 @@ export default function PlayGame() {
   const fetchFriends = useCallback(async () => {
     const { data } = await supabase
       .from("friends")
-      .select(
-        `
-        *,
-        friend_interests (
-          interests (name)
-        )
-      `
-      )
+      .select(`*, friend_interests (interests (name))`)
       .eq("game_id", String(gameId));
 
     if (data && data.length > 0) {
-      const normalized = data.map((f: any) => ({
+      const normalized: Friend[] = (data as RawFriend[]).map((f) => ({
         ...f,
-        interests:
-          f.friend_interests?.map((fi: any) => fi.interests.name) || [],
+        interests: f.friend_interests?.map((fi) => fi.interests.name) || [],
       }));
 
       setFriends(normalized);
@@ -140,7 +148,6 @@ export default function PlayGame() {
             normalizeString(f.name).includes(normalizeString(guess))
           )
           .filter((f) => !guesses.find((g) => g.id === f.id));
-
   return (
     <main className="min-h-screen p-6 max-w-5xl mx-auto font-comic text-gray-900 relative">
       <h1 className="text-4xl font-bold mb-6 text-center text-purple-700">
