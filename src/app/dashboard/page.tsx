@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/app/lib/supabaseClient";
 import { useRouter } from "next/navigation";
+import LoadingOverlay from "@/app/components/LoadingOverlay"; // <-- eklendi
 
 interface Game {
   id: string;
@@ -17,16 +18,23 @@ export default function Dashboard() {
   const [newTitle, setNewTitle] = useState("");
   const [loading, setLoading] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
+  const [initialLoading, setInitialLoading] = useState(true); // <-- eklendi
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data: { user } }) => {
+    const checkUser = async () => {
+      setInitialLoading(true); // <-- loading başlat
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) router.replace("/auth");
       else {
         setEmail(user.email || null);
         setUserId(user.id);
-        fetchGames(user.id);
+        await fetchGames(user.id);
       }
-    });
+      setInitialLoading(false); // <-- loading bitir
+    };
+    checkUser();
   }, [router]);
 
   const fetchGames = async (uid: string) => {
@@ -65,9 +73,10 @@ export default function Dashboard() {
     if (error) console.log(error);
     else setGames(games.filter((g) => g.id !== id));
   };
+  if (initialLoading) return <LoadingOverlay />; // <-- eklendi, kullanıcı verisi yükleniyor
 
   return (
-    <main className="min-h-screen bg-gray-900 text-gray-100 p-6 max-w-4xl mx-auto">
+    <main className="min-h-screen bg-gray-900 text-gray-100 p-6 max-w-4xl rounded-3xl mx-auto">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-3xl font-bold">Dashboard</h1>
         <button

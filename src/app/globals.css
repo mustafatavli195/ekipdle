@@ -32,10 +32,56 @@ body::before {
   position: fixed;
   inset: 0;
   z-index: -1;
-  background-image: url('/images/background.jpg');
+  background-image: url("/images/background.jpg");
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
   opacity: 0.25; /* pastel overlay etkisi */
+  pointer-events: none;
+}
+
+.arrow-up {
+  clip-path: polygon(
+    50% 0%,
+    100% 40%,
+    75% 40%,
+    75% 100%,
+    25% 100%,
+    25% 40%,
+    0% 40%
+  );
+}
+
+.arrow-down {
+  clip-path: polygon(
+    50% 100%,
+    100% 60%,
+    75% 60%,
+    75% 0%,
+    25% 0%,
+    25% 60%,
+    0% 60%
+  );
+}
+
+.box-up::before {
+  content: "▲";
+  position: absolute;
+  font-size: 48px;
+  color: rgba(255, 255, 255, 0.3); /* yarı saydam */
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.box-down::before {
+  content: "▼";
+  position: absolute;
+  font-size: 48px;
+  color: rgba(255, 255, 255, 0.3);
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
   pointer-events: none;
 }

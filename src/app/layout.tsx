@@ -1,8 +1,17 @@
 import "./globals.css";
 import Navbar from "./components/Navbar";
+import { Comic_Neue } from "next/font/google";
+
+// Comic Neue fontunu next/font ile import ediyoruz
+const comic = Comic_Neue({
+  subsets: ["latin"],
+  weight: ["300", "400", "700"],
+  style: ["normal", "italic"],
+  display: "swap",
+});
 
 export const metadata = {
-  title: "Ekipdle",
+  title: "Yourdle",
   description: "Guess Game",
 };
 
@@ -12,18 +21,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="tr">
-      <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Comic+Neue:ital,wght@0,300;0,400;0,700;1,300;1,400;1,700&display=swap"
-          rel="stylesheet"
-        />
-      </head>
-      <body className="bg-gradient-to-br from-purple-200 to-pink-200 font-comic">
+    <html lang="tr" className={comic.className}>
+      <body className="bg-gradient-to-br from-purple-200 to-pink-200">
         <Navbar />
-        <main className="p-6 max-w-5xl mx-auto">{children}</main>
+        <main className="p-6 max-w-5xl mx-auto font-comic">{children}</main>
       </body>
     </html>
   );
