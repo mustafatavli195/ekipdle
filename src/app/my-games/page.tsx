@@ -1,21 +1,50 @@
 "use client";
 
+import { useEffect, useState } from "react";
+import { supabase } from "@/app/lib/supabaseClient";
 import { useRouter } from "next/navigation";
-import { useState, useEffect } from "react";
-import { Settings, Globe } from "lucide-react";
 import LoadingOverlay from "@/app/components/LoadingOverlay";
+import { Settings, Globe } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
-export default function Home() {
+interface Game {
+  id: string;
+  title: string;
+  created_at: string;
+}
+
+export default function MyGames() {
+  const [games, setGames] = useState<Game[]>([]);
+  const [loading, setLoading] = useState(true);
   const router = useRouter();
   const [showSettings, setShowSettings] = useState(false);
   const [showLanguage, setShowLanguage] = useState(false);
-  const [loading, setLoading] = useState(true);
+
+  const fetchGames = async (uid: string) => {
+    setLoading(true);
+    const { data, error } = await supabase
+      .from("games")
+      .select("*")
+      .eq("user_id", uid)
+      .order("created_at", { ascending: false });
+
+    if (error) console.error("Supabase error:", error);
+    else setGames(data || []);
+    setLoading(false);
+  };
 
   useEffect(() => {
-    const timer = setTimeout(() => setLoading(false), 600);
-    return () => clearTimeout(timer);
-  }, []);
+    const getUserAndFetch = async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (user) fetchGames(user.id);
+      else router.push("/login");
+    };
+
+    getUserAndFetch();
+  }, [router]);
 
   if (loading) return <LoadingOverlay />;
 
@@ -34,10 +63,10 @@ export default function Home() {
   }) => (
     <div
       className="fixed inset-0 bg-black/40 flex items-center justify-center z-50"
-      onClick={onClose} // arka plan tıklayınca kapanır
+      onClick={onClose}
     >
       <motion.div
-        onClick={(e) => e.stopPropagation()} // modal tıklaması kapanmayı engeller
+        onClick={(e) => e.stopPropagation()}
         initial="hidden"
         animate="visible"
         exit="exit"
@@ -51,8 +80,8 @@ export default function Home() {
   );
 
   return (
-    <main className="min-h-screen bg-gradient-to-br from-pink-50 via-purple-50 to-blue-50 flex flex-col items-center justify-start p-6 font-comic text-gray-900 rounded-3xl relative">
-      {/* Üstte butonlar */}
+    <main className="min-h-screen bg-gradient-to-br from-pink-50 via-purple-50 to-blue-50 p-6 max-w-5xl mx-auto font-comic text-gray-900 rounded-3xl relative">
+      {/* Üst sağ settings ve language */}
       <div className="absolute top-6 right-6 flex gap-4">
         <button
           onClick={() => setShowLanguage(true)}
@@ -68,39 +97,36 @@ export default function Home() {
         </button>
       </div>
 
-      {/* Menü */}
-      <div className="w-full max-w-md flex flex-col gap-6 m-24">
-        <button
-          onClick={() => router.push("/my-games")}
-          className="w-full py-4 bg-white/40 border-2 border-purple-300 rounded-3xl text-2xl text-purple-700 font-bold hover:bg-white/60 hover:shadow-xl transform hover:scale-105 transition-all duration-300 backdrop-blur-sm cursor-pointer"
-        >
-          Başla
-        </button>
-        <button
-          onClick={() => router.push("/rooms")}
-          className="w-full py-4 bg-white/40 border-2 border-purple-300 rounded-3xl text-2xl text-purple-700 font-bold hover:bg-white/60 hover:shadow-xl transform hover:scale-105 transition-all duration-300 backdrop-blur-sm cursor-pointer"
-        >
-          Oda Ara
-        </button>
-        <button className="w-full py-4 bg-white/40 border-2 border-purple-300 rounded-3xl text-2xl text-purple-700 font-bold hover:bg-white/60 hover:shadow-xl transform hover:scale-105 transition-all duration-300 backdrop-blur-sm cursor-pointer">
-          Oyun Kur
-        </button>
-        <button
-          onClick={() => router.push("/dashboard")}
-          className="w-full py-4 bg-white/40 border-2 border-purple-300 rounded-3xl text-2xl text-purple-700 font-bold hover:bg-white/60 hover:shadow-xl transform hover:scale-105 transition-all duration-300 backdrop-blur-sm cursor-pointer"
-        >
-          Verilerim
-        </button>
-        <button
-          onClick={() => router.push("/profile")}
-          className="w-full py-4 bg-white/40 border-2 border-purple-300 rounded-3xl text-2xl text-purple-700 font-bold hover:bg-white/60 hover:shadow-xl transform hover:scale-105 transition-all duration-300 backdrop-blur-sm cursor-pointer"
-        >
-          Profil
-        </button>
-        <button className="w-full py-4 bg-white/40 border-2 border-purple-300 rounded-3xl text-2xl text-purple-700 font-bold hover:bg-white/60 hover:shadow-xl transform hover:scale-105 transition-all duration-300 backdrop-blur-sm cursor-pointer">
-          Ayarlar
-        </button>
-      </div>
+      <h1 className="text-5xl font-bold mb-10 text-center text-purple-600">
+        Oyunlarım
+      </h1>
+      <hr />
+      <br />
+
+      {games.length === 0 ? (
+        <p className="text-gray-500 text-center mt-24 font-bold text-lg">
+          Henüz oyun oluşturmadın 😢
+        </p>
+      ) : (
+        <ul className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {games.map((game) => (
+            <motion.li
+              key={game.id}
+              onClick={() => router.push(`/game/${game.id}`)}
+              whileHover={{ scale: 1.03 }}
+              whileTap={{ scale: 0.97 }}
+              className="cursor-pointer rounded-3xl p-6 bg-white/40 border-2 border-purple-300 hover:bg-white/60 hover:shadow-xl transform transition-all duration-300 backdrop-blur-sm"
+            >
+              <h2 className="text-2xl font-bold mb-2 text-purple-700">
+                {game.title}
+              </h2>
+              <p className="text-purple-500 text-sm">
+                {new Date(game.created_at).toLocaleDateString()}
+              </p>
+            </motion.li>
+          ))}
+        </ul>
+      )}
 
       {/* Language Modal */}
       <AnimatePresence>

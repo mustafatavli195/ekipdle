@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { supabase } from "@/app/lib/supabaseClient";
 import { useRouter } from "next/navigation";
+import { supabase } from "@/app/lib/supabaseClient";
 
 export default function AuthPage() {
   const router = useRouter();
@@ -22,6 +22,7 @@ export default function AuthPage() {
     e.preventDefault();
     setLoading(true);
     setError(null);
+
     try {
       if (mode === "signup") {
         const { error } = await supabase.auth.signUp({ email, password });
@@ -33,7 +34,7 @@ export default function AuthPage() {
         });
         if (error) throw error;
       }
-      router.replace("/dashboard");
+      router.replace("/dashboard"); // giriş sonrası yönlendirme
     } catch (err: unknown) {
       if (err instanceof Error) setError(err.message);
       else setError("Bir hata oluştu");
@@ -43,16 +44,26 @@ export default function AuthPage() {
   };
 
   const handleGoogleSignIn = async () => {
+    setLoading(true);
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: { redirectTo: window.location.origin + "/dashboard" },
     });
     if (error) setError(error.message);
+    setLoading(false);
   };
 
   return (
-    <main className="min-h-screen bg-gray-900 flex items-center justify-center p-4 text-gray-100">
-      <div className="w-full max-w-md bg-gray-800 border border-gray-700 rounded-2xl p-6 shadow-lg">
+    <main className="min-h-screen bg-gray-900 flex items-center justify-center p-4 text-gray-100 relative">
+      {loading && (
+        <div className="absolute inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="text-white font-bold text-xl animate-pulse">
+            Yükleniyor...
+          </div>
+        </div>
+      )}
+
+      <div className="w-full max-w-md bg-gray-800 border border-gray-700 rounded-2xl p-6 shadow-lg relative z-10">
         <h1 className="text-3xl font-bold mb-6 text-purple-400 text-center">
           {mode === "signup" ? "Kayıt Ol" : "Giriş Yap"}
         </h1>
@@ -65,6 +76,7 @@ export default function AuthPage() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
+            disabled={loading}
           />
           <input
             type="password"
@@ -73,43 +85,32 @@ export default function AuthPage() {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
+            disabled={loading}
           />
           {error && <p className="text-red-500 text-sm">{error}</p>}
 
           <button
+            type="submit"
             disabled={loading}
             className="w-full px-3 py-2 rounded-lg bg-purple-600 hover:bg-purple-700 transition font-bold"
           >
-            {loading
-              ? "İşleniyor..."
-              : mode === "signup"
-              ? "Kayıt Ol"
-              : "Giriş Yap"}
+            {mode === "signup" ? "Kayıt Ol" : "Giriş Yap"}
           </button>
         </form>
 
-        {/* Google ile giriş butonu */}
         <button
           type="button"
           onClick={handleGoogleSignIn}
+          disabled={loading}
           className="w-full mt-4 px-3 py-2 rounded-lg bg-red-600 hover:bg-red-700 transition font-bold text-white flex items-center justify-center gap-2"
         >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            className="h-5 w-5"
-            viewBox="0 0 48 48"
-          >
-            <path
-              fill="#fff"
-              d="M44.5 20H24v8.5h11.7C34 33 30 36 24 36c-7.7 0-14-6.3-14-14s6.3-14 14-14c3.6 0 6.8 1.4 9.3 3.7l6.5-6.5C36 2 30 0 24 0 10.7 0 0 10.7 0 24s10.7 24 24 24c11.6 0 21.3-8.2 23.7-19h-3.2z"
-            />
-          </svg>
           Google ile Giriş Yap
         </button>
 
         <p className="text-sm mt-4 text-gray-400 text-center">
           {mode === "signup" ? "Hesabın var mı?" : "Hesabın yok mu?"}{" "}
           <button
+            disabled={loading}
             className="underline text-purple-400 hover:text-purple-500"
             onClick={() => setMode(mode === "signup" ? "signin" : "signup")}
           >
