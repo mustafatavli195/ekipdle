@@ -11,8 +11,18 @@
     --foreground: #ededed;
   }
 }
-
 body {
+  margin: 0;
+  min-height: 200vh; /* scroll deneyimi için */
+  background: repeating-linear-gradient(
+    45deg,
+    #1d2242 0px,
+    #1d2242 400px,
+    /* koyu şerit kalınlığı */ #13173a 200px,
+    #13173a 800px /* açık şerit kalınlığı */
+  );
+  background-repeat: repeat;
+  background-position: 0 0; /* pattern’in başlangıç noktası */
   font-family: "Comic Neue", sans-serif;
   color: #171717;
 }
@@ -26,17 +36,15 @@ body {
 .font-comic {
   font-family: "Comic Neue", sans-serif;
 }
-
 body::before {
   content: "";
   position: fixed;
   inset: 0;
   z-index: -1;
-  background-image: url("/images/background.jpg");
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
-  opacity: 0.25; /* pastel overlay etkisi */
+  opacity: 0.25; /* pastel overlay efekti */
   pointer-events: none;
 }
 
@@ -84,4 +92,9 @@ body::before {
   left: 50%;
   transform: translate(-50%, -50%);
   pointer-events: none;
+}
+
+nav {
+  background-color: #fecd1a;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='36' height='72' viewBox='0 0 36 72'%3E%3Cg fill-rule='evenodd'%3E%3Cg fill='%239C92AC' fill-opacity='0.4'%3E%3Cpath d='M2 6h12L8 18 2 6zm18 36h12l-6 12-6-12z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
 }

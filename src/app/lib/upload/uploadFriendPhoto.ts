@@ -1,4 +1,4 @@
-import { supabase } from "./supabaseClient";
+import { supabase } from "./supabase/supabaseClient";
 
 export async function uploadFriendPhoto(friendId: string, file: File) {
   const {

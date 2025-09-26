@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { supabase } from "@/app/lib/supabaseClient";
-import LoadingOverlay from "@/app/components/LoadingOverlay";
+import { supabase } from "@/app/lib/supabase/supabaseClient";
+import LoadingOverlay from "@/app/components/Common/LoadingOverlay";
 import { User } from "@supabase/supabase-js";
 
 export default function ProfilePage() {
