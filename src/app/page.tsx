@@ -68,8 +68,8 @@ export default function HomePage() {
           onChange={(e) => setSortOrder(e.target.value as "asc" | "desc")}
           className="w-full md:w-1/3 px-4 h-14 rounded-lg border border-gray-300 bg-white/90 shadow-md focus:outline-none focus:ring-2 focus:ring-purple-400 focus:border-purple-500 transition text-lg"
         >
-          <option value="desc">En Yeni → En Eski</option>
-          <option value="asc">En Eski → En Yeni</option>
+          <option value="desc">Son yüklenenler</option>
+          <option value="asc">İlk yüklenenler</option>
         </select>
       </div>
 
