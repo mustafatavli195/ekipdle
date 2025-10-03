@@ -1,13 +1,16 @@
 "use client";
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
-import { v4 as uuidv4 } from "uuid";
+import { useRouter, useParams } from "next/navigation";
 import { supabase } from "@/app/lib/supabase/supabaseClient";
 
 interface Player {
+  friend_id: string;
   name: string;
-  scorePercent: number;
   avatar?: string;
+  scorePercent: number;
+  first_count: number;
+  second_count: number;
+  third_count: number;
 }
 
 interface Mode {
@@ -17,83 +20,181 @@ interface Mode {
 }
 
 interface Game {
-  title?: string; // title ekledik
-  photoUrl?: string; // optional ekle
+  id: string;
+  title?: string;
+  photoUrl?: string;
 }
 
+interface ModalProps {
+  show: boolean;
+  onClose: () => void;
+  children: React.ReactNode;
+}
+
+interface LeaderboardRow {
+  friend_id: string;
+  friend_name: string;
+  photo_url?: string;
+  total_points: number;
+  first_count: number;
+  second_count: number;
+  third_count: number;
+}
+
+// Basit modal bileşeni
+const Modal: React.FC<ModalProps> = ({ show, onClose, children }) => {
+  if (!show) return null;
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+      <div className="bg-white p-6 rounded-xl w-96 relative">
+        <button
+          onClick={onClose}
+          className="absolute top-2 right-2 text-gray-600 hover:text-gray-900"
+        >
+          ✕
+        </button>
+        {children}
+      </div>
+    </div>
+  );
+};
 export default function BlindRankPage() {
   const [modes, setModes] = useState<Mode[]>([]);
   const [currentModeIndex, setCurrentModeIndex] = useState(0);
   const [showPlayModal, setShowPlayModal] = useState(false);
   const [showAddModeModal, setShowAddModeModal] = useState(false);
   const [newModeName, setNewModeName] = useState("");
-  const [currentGame, setCurrentGame] = useState<Game>({});
+  const [currentGame, setCurrentGame] = useState<Game | null>(null);
+  const [alertMessage, setAlertMessage] = useState<string | null>(null);
+  const [userId, setUserId] = useState<string | null>(null);
 
   const router = useRouter();
+  const params = useParams();
+  const gameId = params.id;
   const currentMode = modes[currentModeIndex];
 
-  // Sayfa açıldığında modları çek
+  // Kullanıcı bilgisi
   useEffect(() => {
+    const fetchUser = async () => {
+      const { data } = await supabase.auth.getSession();
+      setUserId(data?.session?.user?.id ?? null);
+    };
+    fetchUser();
+  }, []);
+
+  // Oyun ve modları çek
+  useEffect(() => {
+    if (!gameId) return;
+
     const fetchData = async () => {
-      // Modları çek
+      const { data: gameData, error: gameError } = await supabase
+        .from("games")
+        .select("id, title, photo_url")
+        .eq("id", gameId)
+        .single();
+      if (gameError || !gameData) return console.error(gameError);
+
+      setCurrentGame({
+        id: gameData.id,
+        title: gameData.title,
+        photoUrl: gameData.photo_url,
+      });
+
       const { data: modesData, error: modesError } = await supabase
-        .from("modes")
+        .from("game_modes")
         .select("*")
+        .eq("game_id", gameData.id)
         .order("created_at", { ascending: true });
 
-      if (modesError) {
-        console.error(modesError);
-        return;
-      }
+      if (modesError) return console.error(modesError);
 
       setModes(
         modesData.map((mode) => ({
-          ...mode,
-          leaderboard: Array.from({ length: 10 }, (_, i) => ({
-            name: `Player ${i + 1}`,
-            scorePercent: Math.floor(Math.random() * 100),
-            avatar: `https://i.pravatar.cc/150?img=${
-              i + 1 + Math.floor(Math.random() * 50)
-            }`,
-          })),
+          id: mode.id,
+          name: mode.name,
+          leaderboard: [],
         }))
       );
-
-      // Games tablosundan oyun bilgilerini çek
-      const { data: gamesData, error: gamesError } = await supabase
-        .from("games")
-        .select("id, title, photo_url");
-
-      if (gamesError) {
-        console.error(gamesError);
-        return;
-      }
-
-      if (gamesData && gamesData.length > 0) {
-        // İlk oyunu default olarak göster
-        setCurrentGame({
-          title: gamesData[0].title,
-          photoUrl: gamesData[0].photo_url,
-        });
-      }
     };
 
     fetchData();
-  }, []);
+  }, [gameId]);
 
-  // Mod ekleme fonksiyonu
+  // Leaderboard çek
+  useEffect(() => {
+    const fetchLeaderboard = async () => {
+      if (!currentMode?.id) return;
+
+      try {
+        const { data, error } = await supabase.rpc("blind_rank_leaderboard", {
+          mode_uuid: currentMode.id,
+        });
+
+        if (error) throw error;
+
+        const leaderboardData = Array.isArray(data) ? data : [];
+
+        setModes((prev) =>
+          prev.map((mode) =>
+            mode.id === currentMode.id
+              ? {
+                  ...mode,
+                  leaderboard: (leaderboardData as LeaderboardRow[]).map(
+                    (p) => ({
+                      friend_id: p.friend_id,
+                      name: p.friend_name,
+                      avatar: p.photo_url,
+                      scorePercent: Number(p.total_points),
+                      first_count: Number(p.first_count),
+                      second_count: Number(p.second_count),
+                      third_count: Number(p.third_count),
+                    })
+                  ),
+                }
+              : mode
+          )
+        );
+      } catch (err) {
+        console.error("RPC fetch error:", err);
+      }
+    };
+
+    fetchLeaderboard();
+  }, [currentMode?.id]);
+
+  // Mode navigation
+  const handleNextMode = () =>
+    setCurrentModeIndex((prev) => (prev + 1) % modes.length);
+  const handlePrevMode = () =>
+    setCurrentModeIndex((prev) => (prev - 1 + modes.length) % modes.length);
+
+  // Oyna
+  const handlePlay = (mode: Mode) => {
+    setShowPlayModal(false);
+    router.push(`/game/${gameId}/blind-rank/${mode.name}`);
+  };
+
+  // Rastgele oynama
+  const handleRandomPlay = () => {
+    if (modes.length === 0) return;
+    const randomMode = modes[Math.floor(Math.random() * modes.length)];
+    router.push(`/game/${gameId}/blind-rank/${randomMode.name}`);
+  };
+
+  // Mod ekleme
   const handleAddMode = async (modeName: string) => {
-    if (!modeName) return;
-
-    const { data, error } = await supabase
-      .from("modes")
-      .insert([{ name: modeName }])
-      .select();
-
-    if (error) {
-      console.error(error);
+    if (!userId) {
+      setAlertMessage("Mod eklemek için giriş yapmalısınız.");
       return;
     }
+    if (!modeName || !currentGame?.id) return;
+
+    const { data, error } = await supabase
+      .from("game_modes")
+      .insert([{ name: modeName, game_id: currentGame.id, created_by: userId }])
+      .select();
+
+    if (error) return console.error(error);
 
     setModes((prev) => [
       ...prev,
@@ -101,183 +202,194 @@ export default function BlindRankPage() {
     ]);
     setNewModeName("");
     setShowAddModeModal(false);
-  };
-
-  // Mod değişimi
-  const handleNextMode = () =>
-    setCurrentModeIndex((prev) => (prev + 1) % modes.length);
-  const handlePrevMode = () =>
-    setCurrentModeIndex((prev) => (prev - 1 + modes.length) % modes.length);
-
-  // Oyna butonu
-  const handlePlay = (mode: Mode) => {
-    setShowPlayModal(false);
-    const gameId = uuidv4();
-    router.push(`/game/${gameId}/blind-rank/${encodeURIComponent(mode.name)}`);
-  };
-
-  // Rastgele oyna
-  const handleRandomPlay = () => {
-    const randomMode = modes[Math.floor(Math.random() * modes.length)];
-    const gameId = uuidv4();
-    router.push(
-      `/game/${gameId}/blind-rank/${encodeURIComponent(randomMode.name)}`
-    );
+    setAlertMessage(null);
   };
 
   return (
-    <main className="min-h-screen p-6 max-w-7xl mx-auto font-comic rounded-2xl text-gray-900 bg-gray-50 flex justify-center">
+    <main className="min-h-screen p-6 max-w-7xl mx-auto font-comic rounded-2xl text-gray-900 bg-gray-50 flex justify-center backdrop-blur-md">
       <div className="flex gap-12 bg-white/30 backdrop-blur-md p-8 rounded-2xl w-full">
-        {/* Sol taraf */}
+        {/* Left */}
         <div className="w-1/3 flex flex-col items-center gap-6">
-          <div className="w-64 h-64 bg-gray-300 rounded-lg mb-4 flex items-center justify-center">
-            {currentGame?.photoUrl ? (
+          <div className="w-full h-64 rounded-xl mb-4 flex items-center justify-center overflow-hidden relative">
+            {currentGame?.photoUrl && (
               <img
-                src={currentGame.photoUrl}
-                alt={currentGame.title}
-                className="w-full h-full object-cover rounded-lg"
+                src={currentGame?.photoUrl}
+                alt={currentGame?.title}
+                className="absolute inset-0 w-full h-full object-cover blur-3xl scale-125"
               />
-            ) : (
-              <span className="text-gray-600 text-lg">Game Image</span>
             )}
+
+            <div className="relative z-10 flex items-center justify-center w-full h-full">
+              {currentGame?.photoUrl && (
+                <img
+                  src={currentGame?.photoUrl}
+                  alt={currentGame?.title}
+                  className="max-w-full max-h-full object-contain rounded-lg shadow-lg"
+                />
+              )}
+            </div>
           </div>
+
+          {/* Oyna Butonu (CTA) */}
           <button
             onClick={() => setShowPlayModal(true)}
-            className="w-64 py-4 text-xl bg-purple-600 text-white rounded hover:bg-purple-700"
+            className="w-64 py-4 text-2xl bg-[#007BFF] text-white font-bold rounded cursor-pointer transition-all duration-300 ease-in-out hover:scale-105 hover:bg-[#0056b3]"
           >
             Oyna
           </button>
+
+          {/* Rastgele Oyna */}
           <button
             onClick={handleRandomPlay}
-            className="w-64 py-4 text-xl bg-blue-600 text-white rounded hover:bg-blue-700"
+            className="w-64 py-4 text-xl bg-[#1D2242] text-white rounded cursor-pointer hover:bg-[#13173A] transition-colors duration-300 ease-in-out"
           >
-            🎲 Rastgele Oyna
+            Rastgele Oyna
           </button>
+
+          {/* Mod Ekle */}
           <button
             onClick={() => setShowAddModeModal(true)}
-            className="w-64 py-3 text-lg bg-green-600 text-white rounded hover:bg-green-700"
+            className="w-64 py-3 text-lg bg-[#1D2242] text-white rounded cursor-pointer hover:bg-[#13173A] transition-colors duration-300 ease-in-out"
           >
-            ➕ Mod Ekle
+            Mod Ekle
           </button>
         </div>
 
-        {/* Sağ taraf */}
+        {/* Right */}
         <div className="w-2/3 flex flex-col gap-6">
-          <h1 className="text-4xl font-bold text-purple-700">
+          <h1 className="text-6xl font-bold">
             {currentGame?.title || "Oyunun Adı"}
           </h1>
-          <p className="text-gray-700">
-            Yapımcı: <span className="font-semibold">Ali Veli</span>
-          </p>
-          <p className="text-gray-700">
-            Kategori: <span className="font-semibold">Zeka Oyunu</span>
-          </p>
-          <p className="text-gray-700">
-            Açıklama:{" "}
-            <span className="font-semibold">
-              Bu oyun, arkadaşlarınızı tahmin etme oyunu.
-            </span>
-          </p>
 
           {/* Leaderboard */}
           {currentMode && (
             <div className="mt-6">
+              {/* Başlık ve mod değiştirme butonları */}
               <div className="flex items-center justify-between mb-4">
                 <button
                   onClick={handlePrevMode}
-                  className="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400"
+                  className="px-3 py-1 bg-gray-300 rounded hover:bg-gray-400 transition"
                 >
                   ←
                 </button>
-                <h2 className="text-2xl font-bold">
+                <h2 className="text-xl font-bold text-[#13173A]">
                   {currentMode.name} Leaderboard
                 </h2>
                 <button
                   onClick={handleNextMode}
-                  className="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400"
+                  className="px-3 py-1 bg-gray-300 rounded hover:bg-gray-400 transition"
                 >
                   →
                 </button>
               </div>
 
-              <div className="space-y-4">
-                {currentMode.leaderboard
-                  .sort((a, b) => b.scorePercent - a.scorePercent)
-                  .slice(0, 10)
-                  .map((player, idx) => (
-                    <div key={idx} className="flex items-center gap-4">
-                      <span className="w-8 text-lg font-bold">{idx + 1}.</span>
-                      <img
-                        src={player.avatar}
-                        alt={player.name}
-                        className="w-12 h-12 rounded-full object-cover"
-                      />
-                      <span className="flex-1 text-lg">{player.name}</span>
-                      <div className="flex-1 bg-gray-300 h-6 rounded-full relative">
-                        <div
-                          className="bg-purple-600 h-6 rounded-full"
-                          style={{ width: `${player.scorePercent}%` }}
-                        ></div>
+              {/* Liste */}
+              <div className="space-y-2">
+                {currentMode.leaderboard.length === 0 ? (
+                  <p className="text-gray-600">Leaderboard boş</p>
+                ) : (
+                  currentMode.leaderboard.map((player, idx) => {
+                    const maxScore =
+                      currentMode.leaderboard[0]?.scorePercent || 1;
+                    const widthPercent = (player.scorePercent / maxScore) * 100;
+
+                    return (
+                      <div
+                        key={player.friend_id}
+                        className="flex items-center gap-3 py-2"
+                      >
+                        {/* Sıra */}
+                        <span className="w-6 text-[#13173A] font-bold">
+                          {idx + 1}.
+                        </span>
+
+                        {/* Avatar */}
+                        <img
+                          src={player.avatar || "/default-avatar.png"}
+                          alt={player.name}
+                          className="w-10 h-10 rounded-full object-cover border-2 border-[#13173A]"
+                        />
+
+                        {/* İsim */}
+                        <span className="flex-1 text-[#13173A] font-medium truncate">
+                          {player.name}
+                        </span>
+
+                        {/* Progress bar */}
+                        <div className="flex-1 bg-gray-200 h-5 rounded-full relative overflow-hidden">
+                          <div
+                            className="bg-[#13173A] h-5 rounded-full transition-all duration-1000 ease-out flex items-center justify-end pr-1 text-white text-xs font-semibold"
+                            style={{ width: `${widthPercent}%` }}
+                          >
+                            {Math.round(widthPercent)}%
+                          </div>
+                        </div>
                       </div>
-                      <span className="w-16 text-right font-semibold">
-                        {player.scorePercent}%
-                      </span>
-                    </div>
-                  ))}
+                    );
+                  })
+                )}
               </div>
             </div>
           )}
         </div>
       </div>
-
-      {/* Mod Seçimi Modal */}
+      {/* PLAY MODAL */}
       {showPlayModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-lg w-96">
-            <h3 className="text-xl font-bold mb-4">Mod Seçimi</h3>
-            {modes.map((mode) => (
-              <div
-                key={mode.id}
-                onClick={() => handlePlay(mode)}
-                className="py-2 px-3 mb-2 bg-gray-100 rounded hover:bg-gray-200 cursor-pointer"
-              >
-                {mode.name}
-              </div>
-            ))}
-            <button
-              onClick={() => setShowPlayModal(false)}
-              className="mt-4 w-full py-2 bg-red-600 text-white rounded hover:bg-red-700"
-            >
-              Kapat
-            </button>
+        <div
+          className="fixed inset-0 bg-black/50 flex items-start justify-center z-50"
+          onClick={() => setShowPlayModal(false)}
+        >
+          <div
+            className="mt-20 bg-white rounded-lg max-w-md w-full p-6 relative"
+            onClick={(e) => e.stopPropagation()} // Modal içi tıklamada kapanmasın
+          >
+            <h2 className="text-2xl font-bold mb-4 text-[#007BFF]">Mod Seç</h2>
+            {modes.length === 0 ? (
+              <p className="text-gray-600">Mod bulunamadı</p>
+            ) : (
+              modes.map((mode) => (
+                <button
+                  key={mode.id}
+                  onClick={() => handlePlay(mode)}
+                  className="w-full py-3 mb-2 bg-[#1D2242] text-white rounded transition-all duration-300 ease-in-out hover:scale-105 hover:bg-[#13173A]"
+                >
+                  {mode.name}
+                </button>
+              ))
+            )}
           </div>
         </div>
       )}
 
-      {/* Mod Ekleme Modal */}
+      {/* ADD MODE MODAL */}
       {showAddModeModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-lg w-96">
-            <h3 className="text-xl font-bold mb-4">Yeni Mod Ekle</h3>
+        <div
+          className="fixed inset-0 bg-black/50 flex items-start justify-center z-50"
+          onClick={() => setShowAddModeModal(false)}
+        >
+          <div
+            className="mt-20 bg-white rounded-lg max-w-md w-full p-6 relative"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="text-2xl font-bold mb-4 text-[#007BFF]">
+              Yeni Mod Ekle
+            </h2>
             <input
               type="text"
-              placeholder="Mod Adı"
-              className="w-full mb-4 p-2 border border-gray-300 rounded"
               value={newModeName}
               onChange={(e) => setNewModeName(e.target.value)}
+              className="w-full mb-4 p-2 border rounded focus:outline-none focus:ring-2 focus:ring-[#007BFF]"
+              placeholder="Mod adı girin"
             />
             <button
               onClick={() => handleAddMode(newModeName)}
-              className="w-full py-2 bg-green-600 text-white rounded hover:bg-green-700"
+              className="w-full py-3 bg-[#1D2242] text-white rounded transition-all duration-300 ease-in-out hover:scale-105 hover:bg-[#13173A]"
             >
               Ekle
             </button>
-            <button
-              onClick={() => setShowAddModeModal(false)}
-              className="mt-2 w-full py-2 bg-red-600 text-white rounded hover:bg-red-700"
-            >
-              Kapat
-            </button>
+            {alertMessage && (
+              <p className="text-red-600 mt-2">{alertMessage}</p>
+            )}
           </div>
         </div>
       )}

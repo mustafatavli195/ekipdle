@@ -5,6 +5,7 @@ export interface Friend {
   id: string;
   name: string;
   photo_url: string;
+  game_id: string; // <-- game_id eklendi
 }
 
 export function useFriends() {
@@ -16,7 +17,7 @@ export function useFriends() {
       setLoading(true);
       const { data, error } = await supabase
         .from("friends")
-        .select("id, name, photo_url")
+        .select("id, name, photo_url, game_id") // <-- game_id eklendi
         .order("created_at", { ascending: true });
 
       if (error) console.error("Supabase error:", error);

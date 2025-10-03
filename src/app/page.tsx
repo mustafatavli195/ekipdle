@@ -88,18 +88,30 @@ export default function HomePage() {
                          w-[320px] sm:w-[350px] md:w-[380px] lg:w-[400px]"
             >
               {/* Üst kısım: Fotoğraf */}
-              <div className="w-full h-56 bg-gray-300 flex items-center justify-center">
-                {game.photo_url ? (
+              <div className="relative w-full h-56 rounded-xl overflow-hidden">
+                {/* Blur arka plan */}
+                {game.photo_url && (
                   <img
                     src={game.photo_url}
                     alt={game.title}
-                    className="w-full h-full object-cover"
+                    className="absolute inset-0 w-full h-full object-cover blur-3xl scale-125"
                   />
-                ) : (
-                  <span className="text-gray-500 text-lg">
-                    Placeholder Fotoğraf
-                  </span>
                 )}
+
+                {/* Ön taraftaki asıl foto */}
+                <div className="relative z-10 flex items-center justify-center w-full h-full">
+                  {game.photo_url ? (
+                    <img
+                      src={game.photo_url}
+                      alt={game.title}
+                      className="max-w-full max-h-full object-contain rounded-lg shadow-lg"
+                    />
+                  ) : (
+                    <span className="text-gray-500 text-lg">
+                      Placeholder Fotoğraf
+                    </span>
+                  )}
+                </div>
               </div>
 
               {/* Alt kısım: Oyun bilgileri */}

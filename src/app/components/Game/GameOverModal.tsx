@@ -5,11 +5,7 @@ import Confetti from "react-confetti";
 import { useGameStore } from "@/app/store/gameStore";
 
 export default function GameOverModal() {
-  const {
-    secretFriend,
-    friends,
-    resetGame, // store’da oluşturacağımız fonksiyon
-  } = useGameStore();
+  const { secretFriend, resetGame } = useGameStore();
 
   if (!secretFriend) return null;
 
@@ -38,7 +34,7 @@ export default function GameOverModal() {
           Doğru cevap: {secretFriend.name}
         </p>
         <button
-          onClick={resetGame} // artık tek fonksiyon
+          onClick={resetGame}
           className="px-6 py-3 bg-purple-500 hover:bg-purple-400 text-white font-bold rounded-2xl shadow-md transition-transform transform hover:-translate-y-1"
         >
           Tekrar Oyna

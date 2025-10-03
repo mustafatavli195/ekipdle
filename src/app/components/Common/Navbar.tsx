@@ -140,7 +140,7 @@ export default function Navbar() {
         {/* Oyun Kur */}
         <Link
           href="/dashboard"
-          className={`${buttonBase} bg-[#13173A] text-white hover:bg-[#0f142d] px-6 py-2 md:px-7 md:py-3 text-lg md:text-xl rounded-2xl font-black`}
+          className={`${buttonBase} bg-[#13173A] text-white hover:bg-[#0f142d]  rounded-2xl font-black`}
           onClick={() => setMenuOpen(false)}
         >
           Oyun Kur

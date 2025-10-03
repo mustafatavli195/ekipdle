@@ -6,7 +6,7 @@ interface DashboardHeaderProps {
 }
 
 export default function DashboardHeader({
-  email,
+  email: _email,
   onLogout,
 }: DashboardHeaderProps) {
   return (
