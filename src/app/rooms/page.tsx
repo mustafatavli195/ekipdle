@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { supabase } from "@/app/lib/supabaseClient";
+import { supabase } from "@/app/lib/supabase/supabaseClient";
 import { useRouter } from "next/navigation";
-import LoadingOverlay from "@/app/components/LoadingOverlay"; // <-- eklendi
+import LoadingOverlay from "@/app/components/Common/LoadingOverlay"; // <-- eklendi
 
 interface Game {
   id: string;

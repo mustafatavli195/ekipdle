@@ -2,180 +2,188 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { supabase } from "@/app/lib/supabaseClient";
-import LoadingOverlay from "@/app/components/LoadingOverlay";
-import { Settings, Globe } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
+import { supabase } from "@/app/lib/supabase/supabaseClient";
+import LoadingOverlay from "@/app/components/Common/LoadingOverlay";
+import LanguageModal from "@/app/components/UI/LanguageModal";
+import SettingsModal from "@/app/components/UI/SettingsModal";
+import {
+  FaBullseye,
+  FaTheaterMasks,
+  FaSmile,
+  FaImage,
+  FaRandom,
+  FaQuestion,
+} from "react-icons/fa";
 
 interface Game {
   id: string;
   title: string;
   created_at: string;
+  photo_url: string | null;
+  user_id: string;
 }
 
-export default function GameDetail() {
+interface User {
+  id: string;
+  full_name: string;
+}
+
+export default function GameDetailPage() {
   const { id } = useParams();
   const [game, setGame] = useState<Game | null>(null);
+  const [creator, setCreator] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-  const router = useRouter();
   const [showSettings, setShowSettings] = useState(false);
   const [showLanguage, setShowLanguage] = useState(false);
+  const [alertMessage, setAlertMessage] = useState(""); // Yeni
+  const router = useRouter();
 
   useEffect(() => {
     const fetchGame = async () => {
       setLoading(true);
-      const { data, error } = await supabase
+      const { data: gameData, error: gameError } = await supabase
         .from("games")
         .select("*")
         .eq("id", id)
         .single();
 
-      if (error) {
-        console.error("Supabase error:", error);
-      } else {
-        setGame(data);
+      if (gameError) {
+        console.error("Supabase error:", gameError);
+        setLoading(false);
+        return;
       }
+
+      setGame(gameData);
+
+      const { data: userData, error: userError } = await supabase
+        .from("users")
+        .select("id, full_name")
+        .eq("id", gameData.user_id)
+        .single();
+
+      if (userError) console.error("User fetch error:", userError);
+      else setCreator(userData);
+
       setLoading(false);
     };
+
     if (id) fetchGame();
   }, [id]);
 
+  const showTempAlert = (message: string) => {
+    setAlertMessage(message);
+    setTimeout(() => setAlertMessage(""), 2000); // 2 saniye sonra kaybolur
+  };
+
   if (loading) return <LoadingOverlay />;
+
   if (!game)
     return (
-      <main className="min-h-screen flex items-center justify-center">
-        <p className="text-xl text-gray-500">Oyun bulunamadı 😢</p>
+      <main className="min-h-screen flex items-center justify-center bg-gray-50">
+        <p className="text-xl text-gray-400">Oyun bulunamadı 😢</p>
       </main>
     );
 
   const modes = [
-    { label: "🎯 Klasik Mod", path: `/game/${game.id}/classic` },
-    { label: "🎭 Replik Modu", path: `/game/${game.id}/quote` },
-    { label: "😂 Emoji Modu", path: `/game/${game.id}/emoji` },
-    { label: "🖼 Görsel Modu", path: `/game/${game.id}/image` },
-    { label: "🔀 Kör Sıralama", path: `/game/${game.id}/blind-rank` },
-    { label: "❓ Quiz Modu", path: `/game/${game.id}/quiz` },
+    {
+      label: "Klasik Mod",
+      path: `/game/${game.id}/classic`,
+      icon: <FaBullseye />,
+    },
+    {
+      label: "Replik Modu",
+      path: `/game/${game.id}/quote`,
+      icon: <FaTheaterMasks />,
+    },
+    { label: "Emoji Modu", path: `/game/${game.id}/emoji`, icon: <FaSmile /> },
+    { label: "Görsel Modu", path: `/game/${game.id}/image`, icon: <FaImage /> },
+    {
+      label: "Kör Sıralama",
+      path: `/game/${game.id}/blind-rank`,
+      icon: <FaRandom />,
+    },
+    { label: "Quiz Modu", path: `/game/${game.id}/quiz`, icon: <FaQuestion /> },
   ];
 
-  const modalVariants = {
-    hidden: { opacity: 0, scale: 0.9 },
-    visible: { opacity: 1, scale: 1 },
-    exit: { opacity: 0, scale: 0.9 },
-  };
-
-  const ModalWrapper = ({
-    children,
-    onClose,
-  }: {
-    children: React.ReactNode;
-    onClose: () => void;
-  }) => (
-    <div
-      className="fixed inset-0 bg-black/40 flex items-center justify-center z-50"
-      onClick={onClose} // arka plan tıklayınca kapanır
-    >
-      <motion.div
-        onClick={(e) => e.stopPropagation()} // modal tıklaması kapanmayı engeller
-        initial="hidden"
-        animate="visible"
-        exit="exit"
-        variants={modalVariants}
-        transition={{ duration: 0.25 }}
-        className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-xl"
-      >
-        {children}
-      </motion.div>
-    </div>
-  );
-
   return (
-    <main className="min-h-screen bg-gradient-to-br from-pink-50 via-purple-50 to-blue-50 p-6 max-w-3xl mx-auto font-comic text-gray-900 rounded-3xl relative">
-      {/* Üst sağ settings ve language */}
-      <div className="absolute top-6 right-6 flex gap-4">
-        <button
-          onClick={() => setShowLanguage(true)}
-          className="p-2 rounded-full bg-white/70 border border-purple-300 hover:bg-white shadow-md transition cursor-pointer hover:scale-105"
-        >
-          <Globe className="w-6 h-6 text-purple-600" />
-        </button>
-        <button
-          onClick={() => setShowSettings(true)}
-          className="p-2 rounded-full bg-white/70 border border-purple-300 hover:bg-white shadow-md transition cursor-pointer hover:scale-105"
-        >
-          <Settings className="w-6 h-6 text-purple-600" />
-        </button>
+    <main className="min-h-screen flex items-start justify-center p-8 pt-16 font-comic relative">
+      <div className="flex flex-col md:flex-row gap-10 w-full max-w-7xl">
+        {/* Sol Kart */}
+
+        <div className="bg-[#1D2242] bg-opacity-100 rounded-3xl shadow-2xl p-8 flex flex-col items-center gap-6 w-full md:w-1/3 text-white border-3 border-black">
+          {game.photo_url ? (
+            <img
+              src={game.photo_url}
+              alt={game.title}
+              className="w-64 h-64 object-contain rounded-lg shadow-lg"
+            />
+          ) : (
+            <div className="w-64 h-64 bg-gray-700 rounded-lg flex items-center justify-center font-bold text-xl">
+              Fotoğraf yok
+            </div>
+          )}
+
+          <h1 className="text-3xl font-bold text-center">{game.title}</h1>
+          <p className="text-gray-300 text-center text-lg">
+            Oluşturulma zamanı:{" "}
+            {new Date(game.created_at).toLocaleString("tr-TR")}
+          </p>
+          {creator && (
+            <p className="text-gray-300 text-center text-lg">
+              Oluşturan: {creator.full_name}
+            </p>
+          )}
+        </div>
+
+        {/* Sağ Kart */}
+        <div className="bg-[#1D2242] bg-opacity-100 rounded-3xl shadow-2xl p-8 flex flex-col gap-8 w-full md:w-2/3 text-white border-3 border-black">
+          <h2 className="text-3xl font-bold text-center mb-4">Mod</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {modes.map((mode) => {
+              const isDisabled = ["quote", "emoji", "image", "quiz"].some((m) =>
+                mode.path.includes(m)
+              );
+
+              return (
+                <div
+                  key={mode.path}
+                  onClick={() =>
+                    isDisabled
+                      ? showTempAlert("Bu mod henüz hazır değil 😢")
+                      : router.push(mode.path)
+                  }
+                  className={`${
+                    isDisabled
+                      ? "cursor-not-allowed opacity-50"
+                      : "cursor-pointer hover:border-[#FFD700] hover:scale-105"
+                  } bg-[#1D2242] bg-opacity-100 border border-black rounded-3xl p-6 flex flex-col items-center justify-center gap-3 text-center shadow-lg transition-all duration-300 transform`}
+                >
+                  <div className="bg-[#314158] rounded-full p-4 text-2xl mb-2 flex items-center justify-center">
+                    {mode.icon}
+                  </div>
+                  <span className="text-xl font-semibold">{mode.label}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
       </div>
 
-      <h1 className="text-5xl font-bold mb-6 text-center text-purple-600">
-        {game.title}
-      </h1>
-      <p className="text-center text-purple-500 mb-10">
-        Oluşturulma tarihi: {new Date(game.created_at).toLocaleDateString()}
-      </p>
+      {/* Uyarı Mesajı */}
+      {alertMessage && (
+        <div className="absolute top-4 left-1/2 transform -translate-x-1/2 bg-red-600 text-white px-6 py-3 rounded-xl shadow-lg z-50 animate-fade-in">
+          {alertMessage}
+        </div>
+      )}
 
-      <div className="flex flex-col gap-6">
-        {modes.map((mode) => (
-          <motion.button
-            key={mode.label}
-            onClick={() => router.push(mode.path)}
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            className="w-full py-6 bg-white/40 border-2 border-purple-300 rounded-3xl text-2xl text-purple-700 font-bold hover:bg-white/60 hover:shadow-xl transition-all duration-300 backdrop-blur-sm cursor-pointer"
-          >
-            {mode.label}
-          </motion.button>
-        ))}
-      </div>
-
-      {/* Language Modal */}
-      <AnimatePresence>
-        {showLanguage && (
-          <ModalWrapper onClose={() => setShowLanguage(false)}>
-            <h2 className="text-xl font-bold text-purple-700 mb-4">
-              🌐 Dil Seç
-            </h2>
-            <div className="flex flex-col gap-3">
-              <button className="py-2 bg-purple-100 rounded-lg hover:bg-purple-200 cursor-pointer">
-                Türkçe
-              </button>
-              <button className="py-2 bg-purple-100 rounded-lg hover:bg-purple-200 cursor-pointer">
-                English
-              </button>
-            </div>
-            <button
-              onClick={() => setShowLanguage(false)}
-              className="mt-6 w-full py-2 bg-gray-200 rounded-lg hover:bg-gray-300 cursor-pointer"
-            >
-              Kapat
-            </button>
-          </ModalWrapper>
-        )}
-      </AnimatePresence>
-
-      {/* Settings Modal */}
-      <AnimatePresence>
-        {showSettings && (
-          <ModalWrapper onClose={() => setShowSettings(false)}>
-            <h2 className="text-xl font-bold text-purple-700 mb-4">
-              ⚙️ Ayarlar
-            </h2>
-            <div className="flex flex-col gap-3">
-              <button className="py-2 bg-purple-100 rounded-lg hover:bg-purple-200 cursor-pointer">
-                Tema: Açık / Koyu
-              </button>
-              <button className="py-2 bg-purple-100 rounded-lg hover:bg-purple-200 cursor-pointer">
-                Bildirimler
-              </button>
-            </div>
-            <button
-              onClick={() => setShowSettings(false)}
-              className="mt-6 w-full py-2 bg-gray-200 rounded-lg hover:bg-gray-300 cursor-pointer"
-            >
-              Kapat
-            </button>
-          </ModalWrapper>
-        )}
-      </AnimatePresence>
+      <LanguageModal
+        isOpen={showLanguage}
+        onClose={() => setShowLanguage(false)}
+      />
+      <SettingsModal
+        isOpen={showSettings}
+        onClose={() => setShowSettings(false)}
+      />
     </main>
   );
 }

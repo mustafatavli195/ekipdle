@@ -1,156 +1,133 @@
 "use client";
 
+import { useEffect, useState, useCallback } from "react";
+import { supabase } from "@/app/lib/supabase/supabaseClient";
 import { useRouter } from "next/navigation";
-import { useState, useEffect } from "react";
-import { Settings, Globe } from "lucide-react";
-import LoadingOverlay from "@/app/components/LoadingOverlay";
-import { motion, AnimatePresence } from "framer-motion";
+import LoadingOverlay from "@/app/components/Common/LoadingOverlay";
 
-export default function Home() {
-  const router = useRouter();
-  const [showSettings, setShowSettings] = useState(false);
-  const [showLanguage, setShowLanguage] = useState(false);
+interface Game {
+  id: string;
+  title: string;
+  created_at: string;
+  photo_url?: string; // <-- eklendi
+}
+
+export default function HomePage() {
+  const [games, setGames] = useState<Game[]>([]);
+  const [filteredGames, setFilteredGames] = useState<Game[]>([]);
   const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+  const [sortOrder, setSortOrder] = useState<"desc" | "asc">("desc");
+  const router = useRouter();
+
+  const fetchGames = useCallback(async () => {
+    setLoading(true);
+    const { data, error } = await supabase
+      .from("games")
+      .select("id, title, created_at, photo_url") // <-- fotoğrafı çekiyoruz
+      .order("created_at", { ascending: sortOrder === "asc" });
+
+    if (error) console.log("Supabase error:", error);
+    else setGames(data || []);
+    setLoading(false);
+  }, [sortOrder]);
 
   useEffect(() => {
-    const timer = setTimeout(() => setLoading(false), 600);
-    return () => clearTimeout(timer);
-  }, []);
+    fetchGames();
+  }, [fetchGames]);
+
+  useEffect(() => {
+    const filtered = games.filter((game) =>
+      game.title.toLowerCase().includes(search.toLowerCase())
+    );
+    setFilteredGames(filtered);
+  }, [search, games]);
 
   if (loading) return <LoadingOverlay />;
 
-  const modalVariants = {
-    hidden: { opacity: 0, scale: 0.9 },
-    visible: { opacity: 1, scale: 1 },
-    exit: { opacity: 0, scale: 0.9 },
-  };
-
-  const ModalWrapper = ({
-    children,
-    onClose,
-  }: {
-    children: React.ReactNode;
-    onClose: () => void;
-  }) => (
-    <div
-      className="fixed inset-0 bg-black/40 flex items-center justify-center z-50"
-      onClick={onClose} // arka plan tıklayınca kapanır
-    >
-      <motion.div
-        onClick={(e) => e.stopPropagation()} // modal tıklaması kapanmayı engeller
-        initial="hidden"
-        animate="visible"
-        exit="exit"
-        variants={modalVariants}
-        transition={{ duration: 0.25 }}
-        className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-xl"
-      >
-        {children}
-      </motion.div>
-    </div>
-  );
-
   return (
-    <main className="min-h-screen bg-gradient-to-br from-pink-50 via-purple-50 to-blue-50 flex flex-col items-center justify-start p-6 font-comic text-gray-900 rounded-3xl relative">
-      {/* Üstte butonlar */}
-      <div className="absolute top-6 right-6 flex gap-4">
-        <button
-          onClick={() => setShowLanguage(true)}
-          className="p-2 rounded-full bg-white/70 border border-purple-300 hover:bg-white shadow-md transition cursor-pointer hover:scale-105"
+    <main className="min-h-screen p-6 font-comic text-gray-900">
+      {/* Search + Filter */}
+      <div className="flex flex-col md:flex-row items-center justify-center gap-4 w-full max-w-2xl mx-auto mb-18">
+        <div className="relative w-full md:w-2/3">
+          {/* Büyüteç ikonu */}
+          <span className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-400 text-xl transition-colors group-focus-within:text-purple-500">
+            🔍
+          </span>
+          <input
+            type="text"
+            placeholder="Oyun Ara..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full pl-14 pr-4 h-14 rounded-lg border border-gray-300 bg-white/90 shadow-md focus:outline-none focus:ring-2 focus:ring-purple-400 focus:border-purple-500 transition placeholder:text-gray-400 placeholder:italic text-lg"
+          />
+        </div>
+
+        <select
+          value={sortOrder}
+          onChange={(e) => setSortOrder(e.target.value as "asc" | "desc")}
+          className="w-full md:w-1/3 px-4 h-14 rounded-lg border border-gray-300 bg-white/90 shadow-md focus:outline-none focus:ring-2 focus:ring-purple-400 focus:border-purple-500 transition text-lg"
         >
-          <Globe className="w-6 h-6 text-purple-600" />
-        </button>
-        <button
-          onClick={() => setShowSettings(true)}
-          className="p-2 rounded-full bg-white/70 border border-purple-300 hover:bg-white shadow-md transition cursor-pointer hover:scale-105"
-        >
-          <Settings className="w-6 h-6 text-purple-600" />
-        </button>
+          <option value="desc">Son yüklenenler</option>
+          <option value="asc">İlk yüklenenler</option>
+        </select>
       </div>
 
-      {/* Menü */}
-      <div className="w-full max-w-md flex flex-col gap-6 m-24">
-        <button
-          onClick={() => router.push("/my-games")}
-          className="w-full py-4 bg-white/40 border-2 border-purple-300 rounded-3xl text-2xl text-purple-700 font-bold hover:bg-white/60 hover:shadow-xl transform hover:scale-105 transition-all duration-300 backdrop-blur-sm cursor-pointer"
-        >
-          Başla
-        </button>
-        <button
-          onClick={() => router.push("/rooms")}
-          className="w-full py-4 bg-white/40 border-2 border-purple-300 rounded-3xl text-2xl text-purple-700 font-bold hover:bg-white/60 hover:shadow-xl transform hover:scale-105 transition-all duration-300 backdrop-blur-sm cursor-pointer"
-        >
-          Oda Ara
-        </button>
-        <button className="w-full py-4 bg-white/40 border-2 border-purple-300 rounded-3xl text-2xl text-purple-700 font-bold hover:bg-white/60 hover:shadow-xl transform hover:scale-105 transition-all duration-300 backdrop-blur-sm cursor-pointer">
-          Oyun Kur
-        </button>
-        <button
-          onClick={() => router.push("/dashboard")}
-          className="w-full py-4 bg-white/40 border-2 border-purple-300 rounded-3xl text-2xl text-purple-700 font-bold hover:bg-white/60 hover:shadow-xl transform hover:scale-105 transition-all duration-300 backdrop-blur-sm cursor-pointer"
-        >
-          Verilerim
-        </button>
-        <button
-          onClick={() => router.push("/profile")}
-          className="w-full py-4 bg-white/40 border-2 border-purple-300 rounded-3xl text-2xl text-purple-700 font-bold hover:bg-white/60 hover:shadow-xl transform hover:scale-105 transition-all duration-300 backdrop-blur-sm cursor-pointer"
-        >
-          Profil
-        </button>
-        <button className="w-full py-4 bg-white/40 border-2 border-purple-300 rounded-3xl text-2xl text-purple-700 font-bold hover:bg-white/60 hover:shadow-xl transform hover:scale-105 transition-all duration-300 backdrop-blur-sm cursor-pointer">
-          Ayarlar
-        </button>
-      </div>
-
-      {/* Language Modal */}
-      <AnimatePresence>
-        {showLanguage && (
-          <ModalWrapper onClose={() => setShowLanguage(false)}>
-            <h2 className="text-xl font-bold text-purple-700 mb-4">
-              🌐 Dil Seç
-            </h2>
-            <div className="flex flex-col gap-3">
-              <button className="py-2 bg-purple-100 rounded-lg hover:bg-purple-200 cursor-pointer">
-                Türkçe
-              </button>
-              <button className="py-2 bg-purple-100 rounded-lg hover:bg-purple-200 cursor-pointer">
-                English
-              </button>
-            </div>
-            <button
-              onClick={() => setShowLanguage(false)}
-              className="mt-6 w-full py-2 bg-gray-200 rounded-lg hover:bg-gray-300 cursor-pointer"
+      {/* Oyun Kartları */}
+      {filteredGames.length === 0 ? (
+        <p className="text-gray-500 text-center mt-24 font-bold text-lg">
+          Henüz oyun yok 😢
+        </p>
+      ) : (
+        <div className="flex flex-wrap justify-center gap-8">
+          {filteredGames.map((game) => (
+            <div
+              key={game.id}
+              onClick={() => router.push(`/game/${game.id}/`)}
+              className="cursor-pointer rounded-3xl border-2 border-purple-300 overflow-hidden hover:shadow-2xl transform hover:scale-105 transition-all duration-300
+                         w-[320px] sm:w-[350px] md:w-[380px] lg:w-[400px]"
             >
-              Kapat
-            </button>
-          </ModalWrapper>
-        )}
-      </AnimatePresence>
+              {/* Üst kısım: Fotoğraf */}
+              <div className="relative w-full h-56 rounded-xl overflow-hidden">
+                {/* Blur arka plan */}
+                {game.photo_url && (
+                  <img
+                    src={game.photo_url}
+                    alt={game.title}
+                    className="absolute inset-0 w-full h-full object-cover blur-3xl scale-125"
+                  />
+                )}
 
-      {/* Settings Modal */}
-      <AnimatePresence>
-        {showSettings && (
-          <ModalWrapper onClose={() => setShowSettings(false)}>
-            <h2 className="text-xl font-bold text-purple-700 mb-4">
-              ⚙️ Ayarlar
-            </h2>
-            <div className="flex flex-col gap-3">
-              <button className="py-2 bg-purple-100 rounded-lg hover:bg-purple-200 cursor-pointer">
-                Tema: Açık / Koyu
-              </button>
-              <button className="py-2 bg-purple-100 rounded-lg hover:bg-purple-200 cursor-pointer">
-                Bildirimler
-              </button>
+                {/* Ön taraftaki asıl foto */}
+                <div className="relative z-10 flex items-center justify-center w-full h-full">
+                  {game.photo_url ? (
+                    <img
+                      src={game.photo_url}
+                      alt={game.title}
+                      className="max-w-full max-h-full object-contain rounded-lg shadow-lg"
+                    />
+                  ) : (
+                    <span className="text-gray-500 text-lg">
+                      Placeholder Fotoğraf
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Alt kısım: Oyun bilgileri */}
+              <div className="p-6 bg-purple-100/20 backdrop-blur-sm flex flex-col flex-1">
+                <h2 className="text-3xl font-bold mb-2 text-purple-700">
+                  {game.title}
+                </h2>
+                <p className="text-purple-500 text-lg">
+                  Oluşturulma Tarihi:{" "}
+                  {new Date(game.created_at).toLocaleDateString()}
+                </p>
+              </div>
             </div>
-            <button
-              onClick={() => setShowSettings(false)}
-              className="mt-6 w-full py-2 bg-gray-200 rounded-lg hover:bg-gray-300 cursor-pointer"
-            >
-              Kapat
-            </button>
-          </ModalWrapper>
-        )}
-      </AnimatePresence>
+          ))}
+        </div>
+      )}
     </main>
   );
 }

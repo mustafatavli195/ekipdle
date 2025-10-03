@@ -1,12 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { supabase } from "@/app/lib/supabase/supabaseClient";
 import { useRouter } from "next/navigation";
-import { supabase } from "@/app/lib/supabaseClient";
 
-export default function AuthPage() {
+export default function LoginPage() {
   const router = useRouter();
-  const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -14,7 +13,7 @@ export default function AuthPage() {
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
-      if (data.session) router.replace("/dashboard");
+      if (data.session) router.replace("/");
     });
   }, [router]);
 
@@ -24,17 +23,12 @@ export default function AuthPage() {
     setError(null);
 
     try {
-      if (mode === "signup") {
-        const { error } = await supabase.auth.signUp({ email, password });
-        if (error) throw error;
-      } else {
-        const { error } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        });
-        if (error) throw error;
-      }
-      router.replace("/dashboard"); // giriş sonrası yönlendirme
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+      if (error) throw error;
+      router.replace("/");
     } catch (err: unknown) {
       if (err instanceof Error) setError(err.message);
       else setError("Bir hata oluştu");
@@ -47,7 +41,7 @@ export default function AuthPage() {
     setLoading(true);
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
-      options: { redirectTo: window.location.origin + "/dashboard" },
+      options: { redirectTo: window.location.origin + "/" },
     });
     if (error) setError(error.message);
     setLoading(false);
@@ -55,19 +49,10 @@ export default function AuthPage() {
 
   return (
     <main className="min-h-screen bg-gray-900 flex items-center justify-center p-4 text-gray-100 relative">
-      {loading && (
-        <div className="absolute inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="text-white font-bold text-xl animate-pulse">
-            Yükleniyor...
-          </div>
-        </div>
-      )}
-
       <div className="w-full max-w-md bg-gray-800 border border-gray-700 rounded-2xl p-6 shadow-lg relative z-10">
         <h1 className="text-3xl font-bold mb-6 text-purple-400 text-center">
-          {mode === "signup" ? "Kayıt Ol" : "Giriş Yap"}
+          Giriş Yap
         </h1>
-
         <form onSubmit={handleSubmit} className="space-y-4">
           <input
             type="email"
@@ -94,7 +79,7 @@ export default function AuthPage() {
             disabled={loading}
             className="w-full px-3 py-2 rounded-lg bg-purple-600 hover:bg-purple-700 transition font-bold"
           >
-            {mode === "signup" ? "Kayıt Ol" : "Giriş Yap"}
+            Giriş Yap
           </button>
         </form>
 
@@ -108,14 +93,13 @@ export default function AuthPage() {
         </button>
 
         <p className="text-sm mt-4 text-gray-400 text-center">
-          {mode === "signup" ? "Hesabın var mı?" : "Hesabın yok mu?"}{" "}
-          <button
-            disabled={loading}
+          Hesabın yok mu?{" "}
+          <a
+            href="/auth/register"
             className="underline text-purple-400 hover:text-purple-500"
-            onClick={() => setMode(mode === "signup" ? "signin" : "signup")}
           >
-            {mode === "signup" ? "Giriş Yap" : "Kayıt Ol"}
-          </button>
+            Kayıt Ol
+          </a>
         </p>
       </div>
     </main>

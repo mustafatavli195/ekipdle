@@ -1,8 +1,8 @@
 "use client";
-import LoadingOverlay from "@/app/components/LoadingOverlay";
+import LoadingOverlay from "@/app/components/Common/LoadingOverlay";
 import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
-import { supabase } from "@/app/lib/supabaseClient";
+import { supabase } from "@/app/lib/supabase/supabaseClient";
 
 import Image from "next/image";
 
@@ -47,6 +47,8 @@ export default function ManageGamePage() {
   const [friends, setFriends] = useState<Friend[]>([]);
   const [allInterests, setAllInterests] = useState<Interest[]>([]);
 
+  const [gamePhoto, setGamePhoto] = useState<File | null>(null);
+
   const [newFriend, setNewFriend] = useState<Friend>({
     name: "",
     height: "",
@@ -63,6 +65,7 @@ export default function ManageGamePage() {
   const [editPhoto, setEditPhoto] = useState<File | null>(null);
   const [editInterests, setEditInterests] = useState<Interest[]>([]);
   const [saving, setSaving] = useState(false);
+  const [savingGamePhoto, setSavingGamePhoto] = useState(false);
 
   useEffect(() => {
     const checkOwnership = async () => {
@@ -70,7 +73,7 @@ export default function ManageGamePage() {
         data: { user },
       } = await supabase.auth.getUser();
       if (!user) {
-        router.replace("/auth");
+        router.replace("/auth/login");
         return;
       }
 
@@ -174,6 +177,54 @@ export default function ManageGamePage() {
     const url = await uploadPhoto(friend.id, file);
     if (url) friend.photo_url = url;
     return friend;
+  };
+
+  const uploadGamePhoto = async (gameId: string, file: File) => {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return null;
+
+    const fileExt = file.name.split(".").pop();
+    const fileName = `${gameId}.${fileExt}`;
+    const filePath = `${user.id}/${fileName}`;
+
+    const { error } = await supabase.storage
+      .from("games")
+      .upload(filePath, file, { upsert: true });
+    if (error) {
+      console.error("Upload game photo error:", error);
+      return null;
+    }
+
+    const { data: urlData } = supabase.storage
+      .from("games")
+      .getPublicUrl(filePath);
+    await supabase
+      .from("games")
+      .update({ photo_url: urlData.publicUrl })
+      .eq("id", gameId);
+
+    return urlData.publicUrl;
+  };
+
+  const handleSaveGamePhoto = async () => {
+    // gameId kesin string olsun
+    const id = Array.isArray(gameId) ? gameId[0] : gameId;
+    if (!gamePhoto || !id) return;
+
+    setSavingGamePhoto(true);
+    try {
+      const photoUrl = await uploadGamePhoto(id, gamePhoto);
+      if (photoUrl) {
+        alert("Oyun fotoğrafı kaydedildi!");
+        setGamePhoto(null); // inputu temizle
+      }
+    } catch (err) {
+      console.error("Oyun fotoğrafı kaydetme hatası:", err);
+    } finally {
+      setSavingGamePhoto(false);
+    }
   };
 
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
@@ -384,6 +435,54 @@ export default function ManageGamePage() {
       <h1 className="text-3xl font-semibold mb-6 text-center">
         Arkadaşları Yönet
       </h1>
+
+      {/* Oyun Fotoğrafı Upload */}
+      <div className="relative col-span-1 md:col-span-2 mb-4">
+        <label
+          htmlFor="game-photo-upload"
+          className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-500 rounded-xl cursor-pointer hover:border-blue-500 transition"
+        >
+          {gamePhoto ? (
+            <span className="text-green-400 font-medium">
+              📷 {gamePhoto.name}
+            </span>
+          ) : (
+            <span className="text-gray-400">
+              📁 Oyun fotoğrafı eklemek için tıklayın veya sürükleyin
+            </span>
+          )}
+          <input
+            id="game-photo-upload"
+            type="file"
+            className="hidden"
+            accept="image/png, image/jpeg"
+            onChange={(e) => {
+              const file = e.target.files?.[0] || null;
+              if (file && !file.type.startsWith("image/")) {
+                alert("Lütfen sadece resim dosyası seçin.");
+                setGamePhoto(null);
+              } else {
+                setGamePhoto(file);
+              }
+            }}
+          />
+        </label>
+      </div>
+
+      {/* Kaydet Butonu */}
+      <div className="col-span-1 md:col-span-2 flex justify-center mb-6">
+        <button
+          onClick={handleSaveGamePhoto}
+          disabled={!gamePhoto || savingGamePhoto}
+          className={`px-6 py-3 rounded-xl font-semibold text-white ${
+            savingGamePhoto
+              ? "bg-blue-400 cursor-not-allowed"
+              : "bg-blue-600 hover:bg-blue-700 shadow-lg"
+          }`}
+        >
+          {savingGamePhoto ? "Kaydediliyor..." : "Kaydet"}
+        </button>
+      </div>
 
       {/* Yeni arkadaş ekleme */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-6">
